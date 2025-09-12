@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Slope Field for first order ODE</title>
+  <title>Slope Field</title>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.10.1/mathquill.min.css">
   <style>
@@ -54,7 +53,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Slope Field for first order ODE</h1>
+    <h1>Slope Field</h1>
     <div class="muted">Domain: x ∈ [-5, 5], y ∈ [-2π, 2π]. Drag the colored points on the y-axis (x=0) to change initial values. Default: dy/dx = sin(y). You can also type an implicit ODE using <code>y'</code>/<code>dy/dx</code> and/or <code>=</code>, e.g. <code>y' + tan(x)*y = x*sin(2*x)</code>.</div>
     
     <div class="bar">
@@ -64,7 +63,7 @@
         <input id="plain" class="plain" placeholder="sin(y)" style="display:none" />
       </div>
       <div class="slider">
-        <label for="step">approx. step</label>
+        <label for="step">Step resolution (approx.)</label>
         <input id="step" type="range" min="0.005" max="0.08" step="0.005" value="0.02"/>
         <span id="stepVal">0.020</span>
       </div>
@@ -100,6 +99,7 @@
         <input id="alen" type="range" min="6" max="28" step="1" value="16" />
         <span id="alenVal">16</span><span class="muted">px</span>
       </div>
+      <label class="chk"><input id="showSol" type="checkbox" checked/> Show solutions</label>
       <label class="chk"><input id="showNull" type="checkbox" checked/> Show nullclines <small>(y'(x,y)=0)</small></label>
       <label class="chk"><input id="showEq" type="checkbox" checked/> Show equilibria <small>(autonomous only)</small></label>
     </div>
@@ -135,11 +135,10 @@
     let latex = "\\\\sin(y)";
     let compiledF = (x,y) => Math.sin(y);
     let usingPlain = false;
-    let arrowMode = 'forward'; // forward/backward/both/none
+    let arrowMode = 'forward';
     let nx = 21, ny = 25, L = 16;
-    let showNull = true, showEq = true;
+    let showSol = true, showNull = true, showEq = true;
 
-    // show parse mode
     let modeInfo = "explicit f(x,y)";
 
     // DOM
@@ -162,6 +161,7 @@
     const nxVal = document.getElementById('nxVal');
     const nyVal = document.getElementById('nyVal');
     const alenVal = document.getElementById('alenVal');
+    const showSolInput = document.getElementById('showSol');
     const showNullInput = document.getElementById('showNull');
     const showEqInput = document.getElementById('showEq');
 
@@ -200,7 +200,7 @@
         s = s.replace(/\\{/g,"(").replace(/\\}/g,")");
         s = s.replace(/\\s+|\\,/g,"");
 
-        // NEW: allow y(x), y(), x()
+        // accept y(x), y(), x()
         s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y');
         s = s.replace(/\by\s*\(\s*\)/gi, 'y');
         s = s.replace(/\bx\s*\(\s*\)/gi, 'x');
@@ -213,7 +213,7 @@
       return /=/.test(s) || /y'/.test(s) || /dy\/dx/.test(s);
     }
 
-    // Compile explicit f(x,y) by injecting Math funcs as params
+    // Compile explicit f(x,y)
     function compileExplicit(expr) {
       const js = String(expr).replace(/\^/g,'**');
       const raw = new Function(
@@ -228,14 +228,12 @@
       return f;
     }
 
-    // Compile implicit F(x,y,m)=0 and solve m = y' via Newton
+    // Compile implicit F(x,y,m)=0 and solve m=y' (Newton)
     function compileImplicit(exprRaw) {
       let s = String(exprRaw).replace(/\s+/g,'');
-      // accept y(x)/y()/x()
       s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y')
            .replace(/\by\s*\(\s*\)/gi, 'y')
            .replace(/\bx\s*\(\s*\)/gi, 'x');
-
       s = s.replace(/dy\/dx/g,'m').replace(/y'/g,'m');
       if (s.includes('=')) {
         const parts = s.split('=');
@@ -299,8 +297,8 @@
       }
     }
 
-    // approx_
-    function approx_Step(f,x,y,h){
+    // approx
+    function approxStep(f,x,y,h){
       const k1 = f(x,y);
       const k2 = f(x + h/2, y + (h/2)*k1);
       const k3 = f(x + h/2, y + (h/2)*k2);
@@ -312,14 +310,14 @@
       let x = x0, y = y0;
       for (let i=0;i<20000 && x < xMax - 1e-12;i++){
         const next = Math.min(x + h, xMax), hh = next - x;
-        y = approx_Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
+        y = approxStep(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
         xs.push(x); ys.push(y);
       }
       const xs2=[], ys2=[];
       x = x0; y = y0;
       for (let i=0;i<20000 && x > xMin + 1e-12;i++){
         const next = Math.max(x - h, xMin), hh = next - x;
-        y = approx_Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
+        y = approxStep(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
         xs2.push(x); ys2.push(y);
       }
       xs2.reverse(); ys2.reverse();
@@ -418,7 +416,7 @@
       }
     }
 
-    // --- Nullclines: marching squares on y'(x,y) = 0 ---
+    // --- Nullclines: y'(x,y) = 0 ---
     function drawNullclines() {
       if (!showNull) return;
       const col = getComputedStyle(document.documentElement).getPropertyValue('--nullcline').trim() || '#f59e0b';
@@ -488,7 +486,7 @@
       }
     }
 
-    // --- Equilibria detection (autonomous only) ---
+    // --- Equilibria (autonomous only) ---
     function isAutonomous() {
       const ysTest = [ymin, (ymin+ymax)/2, ymax].map((y,i)=> y + 0.001*i);
       const xsTest = [xmin, 0, xmax];
@@ -582,12 +580,14 @@
       if (showNull) drawNullclines();
       drawSlopeField();
       if (showEq) drawEquilibria();
-      drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#2563eb');
-      drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#16a34a');
-      drawSolution(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#dc2626');
-      drawHandle(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#2563eb');
-      drawHandle(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#16a34a');
-      drawHandle(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#dc2626');
+      if (showSol) {
+        drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#2563eb');
+        drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#16a34a');
+        drawSolution(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#dc2626');
+        drawHandle(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#2563eb');
+        drawHandle(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#16a34a');
+        drawHandle(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#dc2626');
+      }
     }
 
     function drawSolution(y0, color) {
@@ -647,6 +647,7 @@
     nxInput.addEventListener('input', () => { nx = parseInt(nxInput.value,10); render(); });
     nyInput.addEventListener('input', () => { ny = parseInt(nyInput.value,10); render(); });
     alenInput.addEventListener('input', () => { L = parseInt(alenInput.value,10); render(); });
+    showSolInput.addEventListener('change', () => { showSol = showSolInput.checked; render(); });
     showNullInput.addEventListener('change', () => { showNull = showNullInput.checked; render(); });
     showEqInput.addEventListener('change', () => { showEq = showEqInput.checked; render(); });
 
@@ -685,4 +686,3 @@
   </script>
 </body>
 </html>
-
