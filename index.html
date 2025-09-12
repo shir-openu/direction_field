@@ -7,32 +7,28 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com/" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.10.1/mathquill.min.css">
 
-  <!-- MathJax for pretty equation rendering in the "Parsed as" line -->
+  <!-- MathJax for pretty "Parsed as" rendering -->
   <script id="MathJax-script" async
     src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 
   <style>
     :root {
-      /* ---- Dark palette (navy) ---- */
-      --bg: #0e1424;            /* page background */
-      --panel: #111827;         /* canvas/card bg */
-      --ink: #e5e7eb;           /* primary text */
-      --muted: #9aa6b2;         /* secondary text */
-      --grid: #1f2a3a;          /* grid lines */
-      --axis: #e5e7eb;          /* axes */
-      --field: #9fb3c8;         /* slope field */
+      /* Dark palette */
+      --bg: #0e1424;
+      --panel: #111827;
+      --ink: #e5e7eb;
+      --muted: #9aa6b2;
+      --grid: #1f2a3a;
+      --axis: #e5e7eb;
+      --field: #9fb3c8; /* slope field */
+      --c1: #60a5fa;    /* solution colors */
+      --c2: #34d399;
+      --c3: #f87171;
+      --handle-outline: #0e1424;
 
-      /* light pink dashed for nullclines */
-      --nullcline: #f9a8d4;
-
-      --c1: #60a5fa;            /* blue-400 */
-      --c2: #34d399;            /* green-400 */
-      --c3: #f87171;            /* red-400 */
-      --handle-outline: #0e1424;/* ring same as bg */
-
-      --control-bg: #0f172a;    /* controls bg */
-      --control-border: #233044;/* controls border */
-      --control-hover: #1b2638; /* controls hover */
+      --control-bg: #0f172a;
+      --control-border: #233044;
+      --control-hover: #1b2638;
     }
 
     * { box-sizing: border-box; }
@@ -114,7 +110,7 @@
         <input id="plain" class="plain" placeholder="sin(y)" style="display:inline-block;">
       </div>
 
-      <!-- Removed step resolution control per request -->
+      <!-- removed step-resolution control -->
 
       <div>
         <label for="arrowMode" style="color:var(--muted); font-size:14px; margin-right:6px;">Arrowheads</label>
@@ -149,9 +145,7 @@
         <span id="alenVal">16</span><span class="muted">px</span>
       </div>
       <label class="chk"><input id="showSol" type="checkbox" checked> Show solutions</label>
-      <label class="chk"><input id="showNull" type="checkbox" checked> Show nullclines <small>(y'(x,y)=0)</small></label>
-
-      <!-- Removed equilibria control per request -->
+      <!-- removed: Show nullclines -->
     </div>
 
     <div class="status" id="status">Parsed as: <code id="parsed">-tan(x)*y</code></div>
@@ -180,7 +174,7 @@
 
     // State
     let y0s = [1, 2, -1];
-    let step = 0.02; // still used internally, control removed from UI
+    let step = 0.02; // used internally
     let parseError = "";
 
     // default equation
@@ -190,7 +184,7 @@
     let usingPlain = false;
     let arrowMode = 'forward';
     let nx = 21, ny = 25, L = 16;
-    let showSol = true, showNull = true;
+    let showSol = true;
 
     let modeInfo = "explicit f(x,y)";
 
@@ -213,7 +207,6 @@
     const nyVal = document.getElementById('nyVal');
     const alenVal = document.getElementById('alenVal');
     const showSolInput = document.getElementById('showSol');
-    const showNullInput = document.getElementById('showNull');
 
     // HiDPI
     function setupHiDPI() {
@@ -249,12 +242,9 @@
         s = s.replace(/\\frac\\s*\\{([^{}]+)\\}\\s*\\{([^{}]+)\\}/g, "($1)/($2)");
         s = s.replace(/\{/g,"(").replace(/\}/g,")");
         s = s.replace(/\s+|\\,/g,"");
-
-        // accept y(x), y(), x()
         s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y');
         s = s.replace(/\by\s*\(\s*\)/gi, 'y');
         s = s.replace(/\bx\s*\(\s*\)/gi, 'x');
-
         return s;
       } catch(e) { return ""; }
     }
@@ -330,7 +320,6 @@
           parseError = "";
           modeInfo = "explicit f(x,y)";
           statusEl.className = 'status';
-          // MathJax display
           const shown = usingPlain ? latex : (mqField ? mqField.latex() : latex);
           parsedEl.innerHTML = '\\(' + shown + '\\) <span style="opacity:.7">[' + modeInfo + ']</span>';
           if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([parsedEl]);
@@ -472,80 +461,6 @@
       }
     }
 
-    // --- Nullclines: y'(x,y) = 0 ---
-    function drawNullclines() {
-      if (!showNull) return;
-      const col = getComputedStyle(document.documentElement).getPropertyValue('--nullcline').trim() || '#f9a8d4';
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([8,4]); // dashed look: ---------
-
-      const gx = 60, gy = 60;
-      const xs = new Array(gx).fill(0).map((_,i)=> xmin + i*(xmax-xmin)/(gx-1));
-      const ys = new Array(gy).fill(0).map((_,j)=> ymin + j*(ymax-ymin)/(gy-1));
-      const V = new Array(gx).fill(0).map(()=> new Array(gy).fill(0));
-
-      for (let i=0;i<gx;i++){
-        for (let j=0;j<gy;j++){
-          const val = compiledF(xs[i], ys[j]);
-          V[i][j] = (Number.isFinite(val) ? val : NaN);
-        }
-      }
-
-      function interp(va, vb) {
-        if (!isFinite(va) || !isFinite(vb)) return 0.5;
-        const t = va/(va - vb);
-        return Math.min(1, Math.max(0, t));
-      }
-
-      for (let i=0;i<gx-1;i++){
-        for (let j=0;j<gy-1;j++){
-          const v00 = V[i][j],     v10 = V[i+1][j];
-          const v11 = V[i+1][j+1], v01 = V[i][j+1];
-          if (![v00,v10,v11,v01].every(Number.isFinite)) continue;
-
-          const s00 = v00 > 0, s10 = v10 > 0, s11 = v11 > 0, s01 = v01 > 0;
-          const edges = [];
-
-          if (s00 !== s10) {
-            const t = interp(v00, v10);
-            const x = xToPx(xs[i] + t*(xs[i+1]-xs[i]));
-            const y = yToPx(ys[j]);
-            edges.push({x,y});
-          }
-          if (s10 !== s11) {
-            const t = interp(v10, v11);
-            const x = xToPx(xs[i+1]);
-            const y = yToPx(ys[j] + t*(ys[j+1]-ys[j]));
-            edges.push({x,y});
-          }
-          if (s11 !== s01) {
-            const t = interp(v11, v01);
-            const x = xToPx(xs[i] + t*(xs[i+1]-xs[i]));
-            const y = yToPx(ys[j+1]);
-            edges.push({x,y});
-          }
-          if (s01 !== s00) {
-            const t = interp(v01, v00);
-            const x = xToPx(xs[i]);
-            const y = yToPx(ys[j] + t*(ys[j+1]-ys[j]));
-            edges.push({x,y});
-          }
-
-          if (edges.length === 2) {
-            ctx.beginPath(); ctx.moveTo(edges[0].x, edges[0].y); ctx.lineTo(edges[1].x, edges[1].y); ctx.stroke();
-          } else if (edges.length === 4) {
-            const d1 = Math.hypot(edges[0].x-edges[1].x, edges[0].y-edges[1].y) + Math.hypot(edges[2].x-edges[3].x, edges[2].y-edges[3].y);
-            const d2 = Math.hypot(edges[0].x-edges[3].x, edges[0].y-edges[3].y) + Math.hypot(edges[1].x-edges[2].x, edges[1].y-edges[2].y);
-            const pair = (d1<=d2)? [[0,1],[2,3]] : [[0,3],[1,2]];
-            for (const [a,b] of pair) { ctx.beginPath(); ctx.moveTo(edges[a].x, edges[a].y); ctx.lineTo(edges[b].x, edges[b].y); ctx.stroke(); }
-          }
-        }
-      }
-
-      ctx.setLineDash([]); // reset for other drawings
-    }
-
     // Main rendering
     function render() {
       y0a.textContent = y0s[0].toFixed(3);
@@ -566,7 +481,6 @@
       }
       
       drawGrid();
-      if (showNull) drawNullclines();
       drawSlopeField();
       if (showSol) {
         const col1 = getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa';
@@ -638,7 +552,6 @@
     nyInput.addEventListener('input', () => { ny = parseInt(nyInput.value,10); render(); });
     alenInput.addEventListener('input', () => { L = parseInt(alenInput.value,10); render(); });
     showSolInput.addEventListener('change', () => { showSol = showSolInput.checked; render(); });
-    showNullInput.addEventListener('change', () => { showNull = showNullInput.checked; render(); });
 
     // Editor (MathQuill or plain)
     const mqSpan = document.getElementById('mq');
