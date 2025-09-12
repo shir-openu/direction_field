@@ -144,7 +144,7 @@
       </div>
       <label class="chk"><input id="showSol" type="checkbox" checked> Show solutions</label>
       <label class="chk"><input id="showNull" type="checkbox" checked> Show nullclines <small>(y'(x,y)=0)</small></label>
-      <label class="chk"><input id="showEq" type="checkbox" checked> Show equilibria <small>(autonomous only)</small></label>
+      /* <label class="chk"><input id="showEq" type="checkbox" checked> Show equilibria <small>(autonomous only)</small></label> */
     </div>
 
     <div class="status" id="status">Parsed as: <code id="parsed">sin(y) [explicit f(x,y)]</code></div>
@@ -180,7 +180,9 @@
     let usingPlain = false;
     let arrowMode = 'forward';
     let nx = 21, ny = 25, L = 16;
-    let showSol = true, showNull = true, showEq = true;
+    /* let showSol = true, showNull = true, showEq = true; */
+    let showSol = true, showNull = true;
+
 
     let modeInfo = "explicit f(x,y)";
 
@@ -206,7 +208,7 @@
     const alenVal = document.getElementById('alenVal');
     const showSolInput = document.getElementById('showSol');
     const showNullInput = document.getElementById('showNull');
-    const showEqInput = document.getElementById('showEq');
+    /* const showEqInput = document.getElementById('showEq'); */
 
     // HiDPI
     function setupHiDPI() {
@@ -624,7 +626,7 @@
       drawGrid();
       if (showNull) drawNullclines();
       drawSlopeField();
-      if (showEq) drawEquilibria();
+      /* if (showEq) drawEquilibria(); */
       if (showSol) {
         drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa');
         drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399');
@@ -694,7 +696,7 @@
     alenInput.addEventListener('input', () => { L = parseInt(alenInput.value,10); render(); });
     showSolInput.addEventListener('change', () => { showSol = showSolInput.checked; render(); });
     showNullInput.addEventListener('change', () => { showNull = showNullInput.checked; render(); });
-    showEqInput.addEventListener('change', () => { showEq = showEqInput.checked; render(); });
+    /* showEqInput.addEventListener('change', () => { showEq = showEqInput.checked; render(); }); */
 
     // Editor (MathQuill or plain)
     const mqSpan = document.getElementById('mq');
