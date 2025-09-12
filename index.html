@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Slope Field & RK4 (Nullclines + Equilibria)</title>
+  <title>Slope Field for first order ODE</title>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.10.1/mathquill.min.css">
   <style>
@@ -40,7 +41,7 @@
     .panel { background: var(--panel); border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); overflow:hidden; }
     .btn { background:#f3f4f6; color:#111827; border:1px solid #e5e7eb; padding:6px 10px; border-radius:10px; cursor:pointer; }
     .btn:hover { background:#e5e7eb; }
-    .status { font-size:12px; color:var(--muted); margin-top: 4px; }
+    .status { font-size:12px; color: var(--muted); margin-top: 4px; }
     .status.error { color:#b91c1c; }
     canvas { display:block; width: 100%; height: auto; touch-action: none; }
     .footer { margin-top: 12px; font-size:12px; color:var(--muted); }
@@ -54,7 +55,7 @@
 <body>
   <div class="wrap">
     <h1>Slope Field & RK4 Solutions</h1>
-    <div class="muted">Domain: x ∈ [-5, 5], y ∈ [-2π, 2π]. Drag the colored points on the y‑axis (x=0) to change initial values. Default: dy/dx = sin(y).</div>
+    <div class="muted">Domain: x ∈ [-5, 5], y ∈ [-2π, 2π]. Drag the colored points on the y-axis (x=0) to change initial values. Default: dy/dx = sin(y). You can also type an implicit ODE using <code>y'</code>/<code>dy/dx</code> and/or <code>=</code>, e.g. <code>y' + tan(x)*y = x*sin(2*x)</code>.</div>
     
     <div class="bar">
       <div class="eqn">
@@ -99,7 +100,7 @@
         <input id="alen" type="range" min="6" max="28" step="1" value="16" />
         <span id="alenVal">16</span><span class="muted">px</span>
       </div>
-      <label class="chk"><input id="showNull" type="checkbox" checked/> Show nullclines <small>(f(x,y)=0)</small></label>
+      <label class="chk"><input id="showNull" type="checkbox" checked/> Show nullclines <small>(y'(x,y)=0)</small></label>
       <label class="chk"><input id="showEq" type="checkbox" checked/> Show equilibria <small>(autonomous only)</small></label>
     </div>
 
@@ -116,7 +117,7 @@
     </div>
 
     <div class="footer">
-      Tip: Use LaTeX (<code>\\sin(y)</code>, <code>\\cos(x+y)</code>, <code>\\sqrt{1+y^2}</code>, <code>\\frac{y}{1+x^2}</code>) or plain text (<code>sin(y)</code>). Functions: sin, cos, tan, exp, log (ln), sqrt, +, −, *, /, ^. Variables: x, y. Nullclines are the zero set of f; Equilibria exist only when f does not depend on x.
+      Tip: Use LaTeX (<code>\\sin(y)</code>, <code>\\cos(x+y)</code>, <code>\\sqrt{1+y^2}</code>, <code>\\frac{y}{1+x^2}</code>) or plain text (<code>sin(y)</code>). Functions: sin, cos, tan, exp, log (ln), sqrt, +, −, *, /, ^. Variables: x, y, and (implicitly) y'.
     </div>
   </div>
 
@@ -137,6 +138,9 @@
     let arrowMode = 'forward'; // forward/backward/both/none
     let nx = 21, ny = 25, L = 16;
     let showNull = true, showEq = true;
+
+    // show parse mode
+    let modeInfo = "explicit f(x,y)";
 
     // DOM
     const canvas = document.getElementById('canvas');
@@ -195,33 +199,103 @@
         s = s.replace(/\\\\frac\\s*\\{([^{}]+)\\}\\s*\\{([^{}]+)\\}/g, "($1)/($2)");
         s = s.replace(/\\{/g,"(").replace(/\\}/g,")");
         s = s.replace(/\\s+|\\,/g,"");
+
+        // NEW: allow y(x), y(), x()
+        s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y');
+        s = s.replace(/\by\s*\(\s*\)/gi, 'y');
+        s = s.replace(/\bx\s*\(\s*\)/gi, 'x');
+
         return s;
       } catch(e) { return ""; }
     }
 
+    function isImplicitString(s) {
+      return /=/.test(s) || /y'/.test(s) || /dy\/dx/.test(s);
+    }
+
+    // Compile explicit f(x,y) by injecting Math funcs as params
+    function compileExplicit(expr) {
+      const js = String(expr).replace(/\^/g,'**');
+      const raw = new Function(
+        'x','y','sin','cos','tan','exp','log','sqrt','pi','e',
+        `"use strict"; const val = (${js});
+         return Number.isFinite(val) ? val : NaN;`
+      );
+      const f = (x,y) => raw(
+        x,y, Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt, Math.PI,Math.E
+      );
+      void f(0,0);
+      return f;
+    }
+
+    // Compile implicit F(x,y,m)=0 and solve m = y' via Newton
+    function compileImplicit(exprRaw) {
+      let s = String(exprRaw).replace(/\s+/g,'');
+      // accept y(x)/y()/x()
+      s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y')
+           .replace(/\by\s*\(\s*\)/gi, 'y')
+           .replace(/\bx\s*\(\s*\)/gi, 'x');
+
+      s = s.replace(/dy\/dx/g,'m').replace(/y'/g,'m');
+      if (s.includes('=')) {
+        const parts = s.split('=');
+        s = `(${parts[0]})-(${parts.slice(1).join('=')})`;
+      }
+      s = s.replace(/\^/g,'**');
+
+      const rawF = new Function(
+        'x','y','m','sin','cos','tan','exp','log','sqrt','pi','e',
+        `"use strict"; const val = (${s});
+         return Number.isFinite(val) ? val : NaN;`
+      );
+      const F = (x,y,m) => rawF(
+        x,y,m, Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt, Math.PI,Math.E
+      );
+
+      const EPS = 1e-6;
+      function slope(x,y){
+        const F0 = F(x,y,0);
+        if (!Number.isFinite(F0)) return NaN;
+        const d0 = (F(x,y,EPS) - F(x,y,-EPS)) / (2*EPS);
+        let m = (Number.isFinite(d0) && Math.abs(d0) > 1e-12) ? -F0/d0 : 0;
+
+        for (let it=0; it<12; it++){
+          const f = F(x,y,m);
+          if (!Number.isFinite(f)) return NaN;
+          if (Math.abs(f) < 1e-10) break;
+          const df = (F(x,y,m+EPS) - F(x,y,m-EPS)) / (2*EPS);
+          if (!Number.isFinite(df) || Math.abs(df) < 1e-12) return NaN;
+          m -= f/df;
+          if (!Number.isFinite(m)) return NaN;
+        }
+        return m;
+      }
+      void slope(0,0);
+      return slope;
+    }
+
     function rebuildFunction() {
-      const expr = latexToExpr(latex) || latex;
-      let js = expr
-        .replace(/\\^/g, '**')
-        .replace(/pi/g, 'Math.PI')
-        .replace(/(?<![A-Za-z0-9_\\.])e(?![A-Za-z0-9_])/g, 'Math.E')
-        .replace(/sin/g,'Math.sin')
-        .replace(/cos/g,'Math.cos')
-        .replace(/tan/g,'Math.tan')
-        .replace(/exp/g,'Math.exp')
-        .replace(/log/g,'Math.log')
-        .replace(/sqrt/g,'Math.sqrt');
+      const exprRaw = latexToExpr(latex) || latex;
       try {
-        const f = new Function('x','y',`"use strict"; const val = (${js}); return Number.isFinite(val) ? val : NaN;`);
-        f(0,0);
-        parseError = "";
-        compiledF = f;
-        statusEl.className = 'status';
-        parsedEl.textContent = expr || 'sin(y)';
+        if (!isImplicitString(exprRaw)) {
+          compiledF = compileExplicit(exprRaw);
+          parseError = "";
+          modeInfo = "explicit f(x,y)";
+          statusEl.className = 'status';
+          parsedEl.textContent = exprRaw || 'sin(y)';
+          return;
+        } else {
+          compiledF = compileImplicit(exprRaw);
+          parseError = "";
+          modeInfo = "implicit F(x,y,y')=0";
+          statusEl.className = 'status';
+          parsedEl.textContent = exprRaw;
+        }
       } catch(e) {
         parseError = e && e.message ? e.message : 'Could not parse expression.';
         statusEl.className = 'status error';
         parsedEl.textContent = parseError;
+        compiledF = () => NaN;
       }
     }
 
@@ -316,18 +390,27 @@
       const col = getComputedStyle(document.documentElement).getPropertyValue('--field').trim() || '#475569';
       const stepx = (xmax - xmin) / (nx - 1);
       const stepy = (ymax - ymin) / (ny - 1);
+      const mCap = 1e3;
+
       for (let i=0;i<nx;i++){
         for (let j=0;j<ny;j++){
           const x = xmin + i*stepx;
           const y = ymin + j*stepy;
           const m = compiledF(x,y);
           if (!Number.isFinite(m)) continue;
+
+          const cx = xToPx(x), cy = yToPx(y);
+          if (Math.abs(m) > mCap) {
+            const half = L/2;
+            drawArrow(cx, cy - half, cx, cy + half, col, 5, 0.5, arrowMode);
+            continue;
+          }
+
           const vx = xToPx(x+1) - xToPx(x);
           const vy = (yToPx(y+m) - yToPx(y));
           const len = Math.hypot(vx,vy); if (!len) continue;
           const ux = (vx/len) * (L/2);
           const uy = (vy/len) * (L/2);
-          const cx = xToPx(x), cy = yToPx(y);
           const x0 = cx - ux, y0 = cy - uy;
           const x1 = cx + ux, y1 = cy + uy;
           drawArrow(x0,y0,x1,y1,col,5,0.5,arrowMode);
@@ -335,13 +418,13 @@
       }
     }
 
-    // --- Nullclines: marching squares on f(x,y) = 0 ---
+    // --- Nullclines: marching squares on y'(x,y) = 0 ---
     function drawNullclines() {
       if (!showNull) return;
       const col = getComputedStyle(document.documentElement).getPropertyValue('--nullcline').trim() || '#f59e0b';
       ctx.strokeStyle = col; ctx.lineWidth = 1.5;
 
-      const gx = 60, gy = 60; // resolution for nullcline extraction (independent of arrow grid)
+      const gx = 60, gy = 60;
       const xs = new Array(gx).fill(0).map((_,i)=> xmin + i*(xmax-xmin)/(gx-1));
       const ys = new Array(gy).fill(0).map((_,j)=> ymin + j*(ymax-ymin)/(gy-1));
       const V = new Array(gx).fill(0).map(()=> new Array(gy).fill(0));
@@ -353,8 +436,8 @@
         }
       }
 
-      function interp(a, b, va, vb) {
-        if (!isFinite(va) || !isFinite(vb)) return 0.5; // fallback mid
+      function interp(va, vb) {
+        if (!isFinite(va) || !isFinite(vb)) return 0.5;
         const t = va/(va - vb);
         return Math.min(1, Math.max(0, t));
       }
@@ -368,44 +451,38 @@
           const s00 = v00 > 0, s10 = v10 > 0, s11 = v11 > 0, s01 = v01 > 0;
           const edges = [];
 
-          if (s00 !== s10) { // bottom edge (x from i->i+1 at y=j)
-            const t = interp(v00, v10, v00, v10);
+          if (s00 !== s10) {
+            const t = interp(v00, v10);
             const x = xToPx(xs[i] + t*(xs[i+1]-xs[i]));
             const y = yToPx(ys[j]);
-            edges.push({x,y, edge: 'b'});
+            edges.push({x,y});
           }
-          if (s10 !== s11) { // right edge
-            const t = interp(v10, v11, v10, v11);
+          if (s10 !== s11) {
+            const t = interp(v10, v11);
             const x = xToPx(xs[i+1]);
             const y = yToPx(ys[j] + t*(ys[j+1]-ys[j]));
-            edges.push({x,y, edge: 'r'});
+            edges.push({x,y});
           }
-          if (s11 !== s01) { // top edge
-            const t = interp(v11, v01, v11, v01);
+          if (s11 !== s01) {
+            const t = interp(v11, v01);
             const x = xToPx(xs[i] + t*(xs[i+1]-xs[i]));
             const y = yToPx(ys[j+1]);
-            edges.push({x,y, edge: 't'});
+            edges.push({x,y});
           }
-          if (s01 !== s00) { // left edge
-            const t = interp(v01, v00, v01, v00);
+          if (s01 !== s00) {
+            const t = interp(v01, v00);
             const x = xToPx(xs[i]);
             const y = yToPx(ys[j] + t*(ys[j+1]-ys[j]));
-            edges.push({x,y, edge: 'l'});
+            edges.push({x,y});
           }
 
           if (edges.length === 2) {
             ctx.beginPath(); ctx.moveTo(edges[0].x, edges[0].y); ctx.lineTo(edges[1].x, edges[1].y); ctx.stroke();
           } else if (edges.length === 4) {
-            // ambiguous saddle; choose pairing with minimal total length
             const d1 = Math.hypot(edges[0].x-edges[1].x, edges[0].y-edges[1].y) + Math.hypot(edges[2].x-edges[3].x, edges[2].y-edges[3].y);
             const d2 = Math.hypot(edges[0].x-edges[3].x, edges[0].y-edges[3].y) + Math.hypot(edges[1].x-edges[2].x, edges[1].y-edges[2].y);
-            if (d1 <= d2) {
-              ctx.beginPath(); ctx.moveTo(edges[0].x, edges[0].y); ctx.lineTo(edges[1].x, edges[1].y); ctx.stroke();
-              ctx.beginPath(); ctx.moveTo(edges[2].x, edges[2].y); ctx.lineTo(edges[3].x, edges[3].y); ctx.stroke();
-            } else {
-              ctx.beginPath(); ctx.moveTo(edges[0].x, edges[0].y); ctx.lineTo(edges[3].x, edges[3].y); ctx.stroke();
-              ctx.beginPath(); ctx.moveTo(edges[1].x, edges[1].y); ctx.lineTo(edges[2].x, edges[2].y); ctx.stroke();
-            }
+            const pair = (d1<=d2)? [[0,1],[2,3]] : [[0,3],[1,2]];
+            for (const [a,b] of pair) { ctx.beginPath(); ctx.moveTo(edges[a].x, edges[a].y); ctx.lineTo(edges[b].x, edges[b].y); ctx.stroke(); }
           }
         }
       }
@@ -413,7 +490,6 @@
 
     // --- Equilibria detection (autonomous only) ---
     function isAutonomous() {
-      // check variation with x at few y's
       const ysTest = [ymin, (ymin+ymax)/2, ymax].map((y,i)=> y + 0.001*i);
       const xsTest = [xmin, 0, xmax];
       let maxdiff = 0;
@@ -453,10 +529,8 @@
       for (let i=0;i<N-1;i++){
         const f0 = vals[i], f1 = vals[i+1];
         if (!Number.isFinite(f0) || !Number.isFinite(f1)) continue;
-        if (Math.sign(f0) === 0) { roots.push(ys[i]); continue; }
         if (f0 === 0 || f1 === 0 || f0*f1 < 0) {
           const ystar = bisection(ys[i], ys[i+1], f0, f1);
-          // avoid duplicates
           if (roots.every(r => Math.abs(r-ystar) > 1e-3)) roots.push(ystar);
         }
       }
@@ -473,7 +547,6 @@
       const dash = [6,4];
 
       for (const ystar of eqs) {
-        // classify stability by sign of df/dy at x=0
         const h = 1e-4 * (ymax - ymin);
         const fp = compiledF(0, ystar + h);
         const fm = compiledF(0, ystar - h);
@@ -483,13 +556,11 @@
           if (dfdY < 0) color = colStable;
           else if (dfdY > 0) color = colUnstable;
         }
-        // line
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.setLineDash(dash);
         ctx.beginPath(); ctx.moveTo(xToPx(xmin), yToPx(ystar)); ctx.lineTo(xToPx(xmax), yToPx(ystar)); ctx.stroke();
         ctx.setLineDash([]);
-        // marker at x=0
         ctx.fillStyle = color;
         ctx.beginPath(); ctx.arc(hx, yToPx(ystar), 4, 0, Math.PI*2); ctx.fill();
       }
@@ -505,7 +576,7 @@
       nyVal.textContent = String(ny);
       alenVal.textContent = String(L);
       if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
-      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || 'sin(y)'); }
+      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || 'sin(y)') + ' [' + modeInfo + ']'; }
       
       drawGrid();
       if (showNull) drawNullclines();
@@ -614,3 +685,4 @@
   </script>
 </body>
 </html>
+
