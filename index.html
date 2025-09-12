@@ -54,7 +54,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Slope Field & RK4 Solutions</h1>
+    <h1>Slope Field for first order ODE</h1>
     <div class="muted">Domain: x ∈ [-5, 5], y ∈ [-2π, 2π]. Drag the colored points on the y-axis (x=0) to change initial values. Default: dy/dx = sin(y). You can also type an implicit ODE using <code>y'</code>/<code>dy/dx</code> and/or <code>=</code>, e.g. <code>y' + tan(x)*y = x*sin(2*x)</code>.</div>
     
     <div class="bar">
@@ -64,7 +64,7 @@
         <input id="plain" class="plain" placeholder="sin(y)" style="display:none" />
       </div>
       <div class="slider">
-        <label for="step">RK4 step</label>
+        <label for="step">approx. step</label>
         <input id="step" type="range" min="0.005" max="0.08" step="0.005" value="0.02"/>
         <span id="stepVal">0.020</span>
       </div>
