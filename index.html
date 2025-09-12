@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  /********/
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slope Field</title>
@@ -620,8 +623,21 @@
       nxVal.textContent = String(nx);
       nyVal.textContent = String(ny);
       alenVal.textContent = String(L);
-      if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
-      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || '-tan(x)*y') + ' [' + modeInfo + ']'; }
+      /* if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
+      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || '-tan(x)*y') + ' [' + modeInfo + ']'; } */
+      
+if (parseError) {
+  statusEl.className = 'status error';
+  parsedEl.textContent = parseError;
+} else {
+  statusEl.className = 'status';
+  const shown = usingPlain ? latex : (mqField ? mqField.latex() : latex); // מה שמוצג למשתמש
+  parsedEl.innerHTML = '\\(' + shown + '\\) <span style="opacity:.7">[' + modeInfo + ']</span>';
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([parsedEl]);
+  }
+}
+
       
       drawGrid();
       if (showNull) drawNullclines();
