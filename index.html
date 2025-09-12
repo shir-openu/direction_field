@@ -4,12 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slope Field</title>
+
   <link rel="preconnect" href="https://cdnjs.cloudflare.com/" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.10.1/mathquill.min.css">
-
-  <!-- MathJax for pretty "Parsed as" rendering -->
-  <script id="MathJax-script" async
-    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <!-- MathJax (לא חובה; אם נטען – יצג נוסחאות יפה ב"Parsed as") -->
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 
   <style>
     :root {
@@ -20,8 +19,8 @@
       --muted: #9aa6b2;
       --grid: #1f2a3a;
       --axis: #e5e7eb;
-      --field: #9fb3c8; /* slope field */
-      --c1: #60a5fa;    /* solution colors */
+      --field: #9fb3c8;
+      --c1: #60a5fa;
       --c2: #34d399;
       --c3: #f87171;
       --handle-outline: #0e1424;
@@ -29,70 +28,61 @@
       --control-bg: #0f172a;
       --control-border: #233044;
       --control-hover: #1b2638;
+
+      /* accent (כתום) */
+      --accent: #f59e0b;
+      --accent-soft: rgba(245,158,11,.35);
     }
 
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
-      color: var(--ink);
-      background: var(--bg);
-    }
-    .wrap { max-width: 1160px; margin: 24px auto; padding: 0 16px; }
-    h1 { font-size: 24px; margin: 0 0 8px; }
-    .muted { color: var(--muted); font-size: 14px; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans"; color:var(--ink); background:var(--bg); }
+    .wrap { max-width:1160px; margin:24px auto; padding:0 16px; }
+    h1 { font-size:24px; margin:0 0 8px; }
+    .muted { color:var(--muted); font-size:14px; }
     .bar { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin:16px 0; }
 
     .eqn {
       display:flex; align-items:center; gap:8px;
-      padding: 6px 10px; border:1px solid var(--control-border);
-      border-radius:10px; background: var(--control-bg); min-width:260px; color: var(--ink);
+      padding:6px 10px;
+      border:1px solid var(--accent);          /* מסגרת כתומה */
+      border-radius:10px;
+      background: var(--control-bg);
+      min-width:260px; color: var(--ink);
     }
-    .mq-editable-field, .mq-math-mode { min-height: 32px; }
+    .eqn:focus-within { box-shadow:0 0 0 2px var(--accent-soft); border-color:var(--accent); }
+
+    .mq-editable-field, .mq-math-mode { min-height:32px; color:var(--accent); } /* טקסט כתום במידה ו-MathQuill פעיל */
+    .mq-cursor { border-left-color: var(--accent) !important; }
+
     .plain {
-      min-width: 240px; border: none; outline: none; font-size: 16px;
-      background: transparent; color: var(--ink);
+      min-width:240px; border:none; outline:none; font-size:16px;
+      background:transparent; color:var(--accent);                 /* טקסט כתום בקלט רגיל */
     }
+    .plain::placeholder { color:#fbbf24; }
 
-    .slider { display:flex; align-items:center; gap:8px; color: var(--muted); font-size: 14px; }
-    input[type="range"] { width: 170px; }
+    .slider { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:14px; }
+    input[type="range"] { width:170px; }
 
-    .legend { display:flex; gap:16px; font-size: 14px; align-items:center; color: var(--muted); }
+    .legend { display:flex; gap:16px; font-size:14px; align-items:center; color:var(--muted); }
     .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
 
-    .panel {
-      background: var(--panel); border:1px solid var(--control-border);
-      border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,0.35); overflow:hidden;
-    }
+    .panel { background:var(--panel); border:1px solid var(--control-border); border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,.35); overflow:hidden; }
 
-    .btn {
-      background: var(--control-bg); color: var(--ink);
-      border:1px solid var(--control-border); padding:6px 10px; border-radius:10px; cursor:pointer;
-    }
-    .btn:hover { background: var(--control-hover); }
+    .btn { background:var(--control-bg); color:var(--ink); border:1px solid var(--control-border); padding:6px 10px; border-radius:10px; cursor:pointer; }
+    .btn:hover { background:var(--control-hover); }
 
-    .status { font-size:12px; color: var(--muted); margin-top: 4px; }
+    .status { font-size:12px; color:var(--muted); margin-top:4px; }
     .status.error { color:#fca5a5; }
 
-    canvas { display:block; width: 100%; height: auto; touch-action: none; }
+    canvas { display:block; width:100%; height:auto; touch-action:none; }
 
-    .footer { margin-top: 12px; font-size:12px; color:var(--muted); }
-    code {
-      color:#fbbf24;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
+    .footer { margin-top:12px; font-size:12px; color:var(--muted); }
+    code { color:#fbbf24; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
-    .select, .checkbox {
-      padding:6px 10px; border:1px solid var(--control-border);
-      border-radius:10px; background: var(--control-bg); color: var(--ink); font-size: 14px;
-    }
+    .select, .checkbox { padding:6px 10px; border:1px solid var(--control-border); border-radius:10px; background:var(--control-bg); color:var(--ink); font-size:14px; }
     .group { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
-    label.chk {
-      display:flex; align-items:center; gap:8px; user-select:none;
-      padding: 6px 10px; border:1px solid var(--control-border); border-radius:10px;
-      background: var(--control-bg); color: var(--ink);
-    }
-    label small { color: var(--muted); }
+    label.chk { display:flex; align-items:center; gap:8px; user-select:none; padding:6px 10px; border:1px solid var(--control-border); border-radius:10px; background:var(--control-bg); color:var(--ink); }
+    label small { color:var(--muted); }
   </style>
 </head>
 <body>
@@ -100,17 +90,15 @@
     <h1>Slope Field</h1>
     <div class="muted">
       Domain: x ∈ [-5, 5], y ∈ [-2π, 2π]. Drag the colored points on the y-axis (x=0) to change initial values.
-      Default: dy/dx = -tan(x)*y. You can also type an implicit ODE using <code>y'</code>/<code>dy/dx</code> and/or <code>=</code>, e.g. <code>y' + tan(x)*y = x*sin(2*x)</code>.
+      Supports explicit (e.g. <code>sin(y)</code>) and implicit ODEs (e.g. <code>y' + tan(x)*y = x*sin(2*x)</code>).
     </div>
-    
+
     <div class="bar">
       <div class="eqn">
-        <span>dy/dx =</span>
+        <!-- הוסר "dy/dx =" -->
         <span id="mq" style="display:none;"></span>
-        <input id="plain" class="plain" placeholder="sin(y)" style="display:inline-block;">
+        <input id="plain" class="plain" placeholder="y' + tan(x)*y = x*sin(2*x)" style="display:inline-block">
       </div>
-
-      <!-- removed step-resolution control -->
 
       <div>
         <label for="arrowMode" style="color:var(--muted); font-size:14px; margin-right:6px;">Arrowheads</label>
@@ -121,6 +109,7 @@
           <option value="none">None</option>
         </select>
       </div>
+
       <div class="legend">
         <span><span class="dot" style="background:var(--c1)"></span> y(0) = <span id="y0a">1.000</span></span>
         <span><span class="dot" style="background:var(--c2)"></span> y(0) = <span id="y0b">2.000</span></span>
@@ -131,24 +120,24 @@
     <div class="bar group">
       <div class="slider">
         <label for="nx">Density X</label>
-        <input id="nx" type="range" min="11" max="51" step="2" value="21">
+        <input id="nx" type="range" min="11" max="51" step="2" value="21" />
         <span id="nxVal">21</span>
       </div>
       <div class="slider">
         <label for="ny">Density Y</label>
-        <input id="ny" type="range" min="13" max="61" step="2" value="25">
+        <input id="ny" type="range" min="13" max="61" step="2" value="25" />
         <span id="nyVal">25</span>
       </div>
       <div class="slider">
         <label for="alen">Arrow length</label>
-        <input id="alen" type="range" min="6" max="28" step="1" value="16">
+        <input id="alen" type="range" min="6" max="28" step="1" value="16" />
         <span id="alenVal">16</span><span class="muted">px</span>
       </div>
-      <label class="chk"><input id="showSol" type="checkbox" checked> Show solutions</label>
-      <!-- removed: Show nullclines -->
+      <label class="chk"><input id="showSol" type="checkbox" checked/> Show solutions</label>
+      <!-- הוסרו Nullclines / Equilibria / Step resolution -->
     </div>
 
-    <div class="status" id="status">Parsed as: <code id="parsed">-tan(x)*y</code></div>
+    <div class="status" id="status">Parsed as: <span id="parsed">y' + tan(x)*y = x*sin(2*x)</span></div>
 
     <div class="panel">
       <canvas id="canvas" width="980" height="640"></canvas>
@@ -157,11 +146,12 @@
     <div class="bar" style="gap:8px; margin-top:10px;">
       <button class="btn" id="resetPoints">Reset initial points</button>
       <button class="btn" id="resetEqn">Reset equation</button>
-      <span class="status" id="note" aria-live="polite">MathQuill unavailable — using plain text input (type e.g. sin(y), cos(x+y), sqrt(1+y^2)).</span>
+      <span class="status" id="note" aria-live="polite"></span>
     </div>
 
     <div class="footer">
-      Tip: Use LaTeX (<code>\\sin(y)</code>, <code>\\cos(x+y)</code>, <code>\\sqrt{1+y^2}</code>, <code>\\frac{y}{1+x^2}</code>) or plain text (<code>sin(y)</code>). Functions: sin, cos, tan, exp, log (ln), sqrt, +, −, *, /, ^. Variables: x, y, and (implicitly) y'.
+      Tip: Use LaTeX (<code>\\sin(y)</code>, <code>\\cos(x+y)</code>, <code>\\sqrt{1+y^2}</code>, <code>\\frac{y}{1+x^2}</code>) or plain text.
+      Variables: x, y, and (implicitly) y'.
     </div>
   </div>
 
@@ -172,21 +162,22 @@
     const ymin = -2*Math.PI, ymax = 2*Math.PI;
     const width = 980, height = 640;
 
-    // State
+    // --- State ---
     let y0s = [1, 2, -1];
-    let step = 0.02; // used internally
+    const step = 0.02;                   // צעד קבוע (הסליידר הוסר)
     let parseError = "";
 
-    // default equation
-    let latex = "-tan(x)*y";
-    let compiledF = (x,y) => -Math.tan(x)*y;
+    // --- START default equation ---
+    let latex = "y' + tan(x)*y = x*sin(2*x)";
+    // --- END default equation ---
 
+    let compiledF = (x,y) => -Math.tan(x)*y; // יוחלף ב-rebuildFunction
     let usingPlain = false;
     let arrowMode = 'forward';
     let nx = 21, ny = 25, L = 16;
     let showSol = true;
 
-    let modeInfo = "explicit f(x,y)";
+    let modeInfo = "explicit/implicit";
 
     // DOM
     const canvas = document.getElementById('canvas');
@@ -233,37 +224,32 @@
         s = s.replace(/\\left|\\right/g,"");
         s = s.replace(/\\cdot|\\times/g,"*");
         s = s.replace(/\\pi/g,"pi");
-        s = s.replace(/\\sin/g,"sin");
-        s = s.replace(/\\cos/g,"cos");
-        s = s.replace(/\\tan/g,"tan");
-        s = s.replace(/\\exp/g,"exp");
-        s = s.replace(/\\ln/g,"log");
+        s = s.replace(/\\sin/g,"sin").replace(/\\cos/g,"cos").replace(/\\tan/g,"tan");
+        s = s.replace(/\\exp/g,"exp").replace(/\\ln/g,"log");
         s = s.replace(/\\sqrt\\s*\\{([^{}]+)\\}/g, "sqrt($1)");
         s = s.replace(/\\frac\\s*\\{([^{}]+)\\}\\s*\\{([^{}]+)\\}/g, "($1)/($2)");
-        s = s.replace(/\{/g,"(").replace(/\}/g,")");
-        s = s.replace(/\s+|\\,/g,"");
+        s = s.replace(/\\{/g,"(").replace(/\\}/g,")");
+        s = s.replace(/\\s+|\\,/g,"");
+
+        // accept y(x), y(), x()
         s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y');
         s = s.replace(/\by\s*\(\s*\)/gi, 'y');
         s = s.replace(/\bx\s*\(\s*\)/gi, 'x');
+
         return s;
       } catch(e) { return ""; }
     }
 
-    function isImplicitString(s) {
-      return /=/.test(s) || /y'/.test(s) || /dy\/dx/.test(s);
-    }
+    function isImplicitString(s) { return /=/.test(s) || /y'/.test(s) || /dy\/dx/.test(s); }
 
     // Compile explicit f(x,y)
     function compileExplicit(expr) {
       const js = String(expr).replace(/\^/g,'**');
       const raw = new Function(
         'x','y','sin','cos','tan','exp','log','sqrt','pi','e',
-        `"use strict"; const val = (${js});
-         return Number.isFinite(val) ? val : NaN;`
+        `"use strict"; const val = (${js}); return Number.isFinite(val) ? val : NaN;`
       );
-      const f = (x,y) => raw(
-        x,y, Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt, Math.PI,Math.E
-      );
+      const f = (x,y) => raw(x,y, Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt, Math.PI,Math.E);
       void f(0,0);
       return f;
     }
@@ -283,12 +269,9 @@
 
       const rawF = new Function(
         'x','y','m','sin','cos','tan','exp','log','sqrt','pi','e',
-        `"use strict"; const val = (${s});
-         return Number.isFinite(val) ? val : NaN;`
+        `"use strict"; const val = (${s}); return Number.isFinite(val) ? val : NaN;`
       );
-      const F = (x,y,m) => rawF(
-        x,y,m, Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt, Math.PI,Math.E
-      );
+      const F = (x,y,m) => rawF(x,y,m, Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt, Math.PI,Math.E);
 
       const EPS = 1e-6;
       function slope(x,y){
@@ -317,22 +300,14 @@
       try {
         if (!isImplicitString(exprRaw)) {
           compiledF = compileExplicit(exprRaw);
-          parseError = "";
-          modeInfo = "explicit f(x,y)";
-          statusEl.className = 'status';
-          const shown = usingPlain ? latex : (mqField ? mqField.latex() : latex);
-          parsedEl.innerHTML = '\\(' + shown + '\\) <span style="opacity:.7">[' + modeInfo + ']</span>';
-          if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([parsedEl]);
-          return;
+          parseError = ""; modeInfo = "explicit f(x,y)";
         } else {
           compiledF = compileImplicit(exprRaw);
-          parseError = "";
-          modeInfo = "implicit F(x,y,y')=0";
-          statusEl.className = 'status';
-          const shown = usingPlain ? latex : (mqField ? mqField.latex() : latex);
-          parsedEl.innerHTML = '\\(' + shown + '\\) <span style="opacity:.7">[' + modeInfo + ']</span>';
-          if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([parsedEl]);
+          parseError = ""; modeInfo = "implicit F(x,y,y')=0";
         }
+        statusEl.className = 'status';
+        parsedEl.textContent = latex; // הצגה כטקסט; אם MathJax קיים והוא ב־LaTeX, הוא ימומש דרך typesetPromise:
+        if (window.MathJax) { MathJax.typesetPromise?.(); }
       } catch(e) {
         parseError = e && e.message ? e.message : 'Could not parse expression.';
         statusEl.className = 'status error';
@@ -341,8 +316,8 @@
       }
     }
 
-    // Integrator (RK4 core kept internally)
-    function approxStep(f,x,y,h){
+    // אינטגרציה קדימה ואחורה (RK4 core)
+    function rk4Step(f,x,y,h){
       const k1 = f(x,y);
       const k2 = f(x + h/2, y + (h/2)*k1);
       const k3 = f(x + h/2, y + (h/2)*k2);
@@ -354,14 +329,14 @@
       let x = x0, y = y0;
       for (let i=0;i<20000 && x < xMax - 1e-12;i++){
         const next = Math.min(x + h, xMax), hh = next - x;
-        y = approxStep(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
+        y = rk4Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
         xs.push(x); ys.push(y);
       }
       const xs2=[], ys2=[];
       x = x0; y = y0;
       for (let i=0;i<20000 && x > xMin + 1e-12;i++){
         const next = Math.max(x - h, xMin), hh = next - x;
-        y = approxStep(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
+        y = rk4Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
         xs2.push(x); ys2.push(y);
       }
       xs2.reverse(); ys2.reverse();
@@ -378,14 +353,8 @@
       ctx.lineWidth = 1;
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || '#1f2a3a';
       ctx.beginPath();
-      for (let gx = Math.ceil(xmin); gx <= Math.floor(xmax); gx++) {
-        const px = xToPx(gx);
-        ctx.moveTo(px,0); ctx.lineTo(px,height);
-      }
-      for (let gy = -6; gy <= 6; gy++) {
-        const py = yToPx(gy);
-        ctx.moveTo(0,py); ctx.lineTo(width,py);
-      }
+      for (let gx = Math.ceil(xmin); gx <= Math.floor(xmax); gx++) { const px = xToPx(gx); ctx.moveTo(px,0); ctx.lineTo(px,height); }
+      for (let gy = -6; gy <= 6; gy++) { const py = yToPx(gy); ctx.moveTo(0,py); ctx.lineTo(width,py); }
       ctx.stroke();
 
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--axis').trim() || '#e5e7eb';
@@ -398,21 +367,13 @@
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#e5e7eb';
       ctx.font = '14px ui-sans-serif, system-ui, -apple-system';
       ctx.textAlign = 'center';
-      for (let gx = Math.ceil(xmin); gx <= Math.floor(xmax); gx++) {
-        const px = xToPx(gx);
-        ctx.fillText(String(gx), px, xAxisY + 16);
-      }
+      for (let gx = Math.ceil(xmin); gx <= Math.floor(xmax); gx++) { const px = xToPx(gx); ctx.fillText(String(gx), px, xAxisY + 16); }
       ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-      for (let gy = -6; gy <= 6; gy++) {
-        const py = yToPx(gy);
-        if (Math.abs(gy) === 6) continue;
-        ctx.fillText(String(gy), xToPx(0) - 6, py);
-      }
+      for (let gy = -6; gy <= 6; gy++) { const py = yToPx(gy); if (Math.abs(gy) === 6) continue; ctx.fillText(String(gy), xToPx(0) - 6, py); }
     }
 
     function drawArrow(x0,y0,x1,y1,color,headLen=6,headAng=0.5,mode='forward'){
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
       if (mode === 'none') return;
       const dx = x1 - x0, dy = y1 - y0, ang = Math.atan2(dy, dx);
@@ -420,10 +381,7 @@
         const a1 = angle - headAng, a2 = angle + headAng;
         const xh1 = x - headLen * Math.cos(a1), yh1 = y - headLen * Math.sin(a1);
         const xh2 = x - headLen * Math.cos(a2), yh2 = y - headLen * Math.sin(a2);
-        ctx.beginPath();
-        ctx.moveTo(x,y); ctx.lineTo(xh1,yh1);
-        ctx.moveTo(x,y); ctx.lineTo(xh2,yh2);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(xh1,yh1); ctx.moveTo(x,y); ctx.lineTo(xh2,yh2); ctx.stroke();
       };
       if (mode === 'forward' || mode === 'both') drawHeadAt(x1,y1,ang);
       if (mode === 'backward' || mode === 'both') drawHeadAt(x0,y0,ang+Math.PI);
@@ -443,20 +401,14 @@
           if (!Number.isFinite(m)) continue;
 
           const cx = xToPx(x), cy = yToPx(y);
-          if (Math.abs(m) > mCap) {
-            const half = L/2;
-            drawArrow(cx, cy - half, cx, cy + half, col, 5, 0.5, arrowMode);
-            continue;
-          }
+          if (Math.abs(m) > mCap) { const half = L/2; drawArrow(cx, cy - half, cx, cy + half, col, 5, 0.5, arrowMode); continue; }
 
           const vx = xToPx(x+1) - xToPx(x);
           const vy = (yToPx(y+m) - yToPx(y));
           const len = Math.hypot(vx,vy); if (!len) continue;
           const ux = (vx/len) * (L/2);
           const uy = (vy/len) * (L/2);
-          const x0 = cx - ux, y0 = cy - uy;
-          const x1 = cx + ux, y1 = cy + uy;
-          drawArrow(x0,y0,x1,y1,col,5,0.5,arrowMode);
+          drawArrow(cx-ux, cy-uy, cx+ux, cy+uy, col, 5, 0.5, arrowMode);
         }
       }
     }
@@ -470,48 +422,30 @@
       nyVal.textContent = String(ny);
       alenVal.textContent = String(L);
 
-      if (parseError) {
-        statusEl.className = 'status error';
-        parsedEl.textContent = parseError;
-      } else {
-        statusEl.className = 'status';
-        const shown = usingPlain ? latex : (mqField ? mqField.latex() : latex);
-        parsedEl.innerHTML = '\\(' + shown + '\\) <span style="opacity:.7">[' + modeInfo + ']</span>';
-        if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([parsedEl]);
-      }
-      
+      if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
+      else { statusEl.className = 'status'; parsedEl.textContent = (latex) + ' [' + modeInfo + ']'; if (window.MathJax) { MathJax.typesetPromise?.(); } }
+
       drawGrid();
       drawSlopeField();
       if (showSol) {
-        const col1 = getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa';
-        const col2 = getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399';
-        const col3 = getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#f87171';
-        drawSolution(y0s[0], col1);
-        drawSolution(y0s[1], col2);
-        drawSolution(y0s[2], col3);
-        drawHandle(y0s[0], col1);
-        drawHandle(y0s[1], col2);
-        drawHandle(y0s[2], col3);
+        drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa');
+        drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399');
+        drawSolution(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#f87171');
+        drawHandle(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa');
+        drawHandle(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399');
+        drawHandle(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#f87171');
       }
     }
 
     function drawSolution(y0, color) {
       const { xs, ys } = integrateBoth(compiledF, 0, y0, xmin, xmax, step);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let k=0;k<xs.length;k++){
-        const px = xToPx(xs[k]);
-        const py = yToPx(ys[k]);
-        if (k===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-      }
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+      for (let k=0;k<xs.length;k++){ const px = xToPx(xs[k]); const py = yToPx(ys[k]); if (k===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
       ctx.stroke();
     }
-
     function drawHandle(y0, color) {
       const hx = xToPx(0), hy = yToPx(y0), r = 6;
-      ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(hx,hy,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = color; ctx.beginPath(); ctx.arc(hx,hy,r,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--handle-outline').trim() || '#0e1424';
       ctx.lineWidth = 1.5; ctx.stroke();
     }
@@ -520,8 +454,7 @@
     let activeIdx = -1;
     canvas.addEventListener('pointerdown', (e) => {
       const rect = canvas.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
+      const px = e.clientX - rect.left; const py = e.clientY - rect.top;
       const hx = xToPx(0), r = 10;
       const ysPx = y0s.map(y => yToPx(y));
       activeIdx = -1;
@@ -529,31 +462,31 @@
     });
     window.addEventListener('pointermove', (e) => {
       if (activeIdx < 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const py = e.clientY - rect.top;
-      let newY = pxToY(py);
-      if (newY < ymin) newY = ymin;
-      if (newY > ymax) newY = ymax;
-      y0s[activeIdx] = newY;
-      render();
+      const rect = canvas.getBoundingClientRect(); const py = e.clientY - rect.top;
+      let newY = pxToY(py); if (newY < ymin) newY = ymin; if (newY > ymax) newY = ymax;
+      y0s[activeIdx] = newY; render();
     });
     window.addEventListener('pointerup', () => { activeIdx = -1; });
 
     // UI bindings
     resetPoints.addEventListener('click', () => { y0s = [1,2,-1]; render(); });
+
+    // --- START reset to default equation ---
     resetEqn.addEventListener('click', () => {
-      latex = "-tan(x)*y";
+      latex = "y' + tan(x)*y = x*sin(2*x)";
       if (!usingPlain && window.MathQuill && mqField) mqField.latex(latex);
-      if (usingPlain) plain.value = "-tan(x)*y";
+      if (usingPlain) plain.value = "y' + tan(x)*y = x*sin(2*x)";
       rebuildFunction(); render();
     });
+    // --- END reset to default equation ---
+
     arrowSel.addEventListener('change', () => { arrowMode = arrowSel.value; render(); });
     nxInput.addEventListener('input', () => { nx = parseInt(nxInput.value,10); render(); });
     nyInput.addEventListener('input', () => { ny = parseInt(nyInput.value,10); render(); });
     alenInput.addEventListener('input', () => { L = parseInt(alenInput.value,10); render(); });
     showSolInput.addEventListener('change', () => { showSol = showSolInput.checked; render(); });
 
-    // Editor (MathQuill or plain)
+    // Editor (MathQuill או plain)
     const mqSpan = document.getElementById('mq');
     const plain = document.getElementById('plain');
     let mqField = null;
@@ -576,7 +509,11 @@
       usingPlain = true;
       mqSpan.style.display = 'none';
       plain.style.display = 'inline-block';
-      plain.value = '-tan(x)*y';
+
+      // --- START plain default value ---
+      plain.value = "y' + tan(x)*y = x*sin(2*x)";
+      // --- END plain default value ---
+
       plain.addEventListener('input', () => { latex = plain.value; rebuildFunction(); render(); });
       note.textContent = 'MathQuill unavailable — using plain text input (type e.g. sin(y), cos(x+y), sqrt(1+y^2)).';
       rebuildFunction(); render();
