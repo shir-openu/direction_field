@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script id="MathJax-script" async
-  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
-  /********/
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slope Field</title>
@@ -19,7 +16,10 @@
       --grid: #1f2a3a;          /* grid lines */
       --axis: #e5e7eb;          /* axes */
       --field: #9fb3c8;         /* slope field */
-      --nullcline: #f59e0b;     /* amber */
+
+      /* light pink for nullclines */
+      --nullcline: #f9a8d4;     /* light pink */
+
       --eq-stable: #10b981;     /* emerald */
       --eq-unstable: #ef4444;   /* red */
       --eq-neutral: #a1a1aa;    /* zinc-400 */
@@ -105,8 +105,8 @@
     <div class="bar">
       <div class="eqn">
         <span>dy/dx =</span>
-        <span id="mq" style="display: none;"></span>
-        <input id="plain" class="plain" placeholder="sin(y)" style="display: inline-block;">
+        <span id="mq" style="display:none;"></span>
+        <input id="plain" class="plain" placeholder="sin(y)" style="display:inline-block;">
       </div>
       <div class="slider">
         <label for="step">Step resolution (approx.)</label>
@@ -147,10 +147,10 @@
       </div>
       <label class="chk"><input id="showSol" type="checkbox" checked> Show solutions</label>
       <label class="chk"><input id="showNull" type="checkbox" checked> Show nullclines <small>(y'(x,y)=0)</small></label>
-      /* <label class="chk"><input id="showEq" type="checkbox" checked> Show equilibria <small>(autonomous only)</small></label> */
+      <label class="chk"><input id="showEq" type="checkbox" checked> Show equilibria <small>(autonomous only)</small></label>
     </div>
 
-    <div class="status" id="status">Parsed as: <code id="parsed">sin(y) [explicit f(x,y)]</code></div>
+    <div class="status" id="status">Parsed as: <code id="parsed">-tan(x)*y [explicit f(x,y)]</code></div>
 
     <div class="panel">
       <canvas id="canvas" width="980" height="640"></canvas>
@@ -178,14 +178,15 @@
     let y0s = [1, 2, -1];
     let step = 0.02;
     let parseError = "";
-    let latex = "-tan(x)*y";                        // CHANGED: default
-    let compiledF = (x,y) => -Math.tan(x)*y;        // CHANGED: default
+
+    // default: -tan(x)*y
+    let latex = "-tan(x)*y";
+    let compiledF = (x,y) => -Math.tan(x)*y;
+
     let usingPlain = false;
     let arrowMode = 'forward';
     let nx = 21, ny = 25, L = 16;
-    /* let showSol = true, showNull = true, showEq = true; */
-    let showSol = true, showNull = true;
-
+    let showSol = true, showNull = true, showEq = true;
 
     let modeInfo = "explicit f(x,y)";
 
@@ -211,7 +212,7 @@
     const alenVal = document.getElementById('alenVal');
     const showSolInput = document.getElementById('showSol');
     const showNullInput = document.getElementById('showNull');
-    /* const showEqInput = document.getElementById('showEq'); */
+    const showEqInput = document.getElementById('showEq');
 
     // HiDPI
     function setupHiDPI() {
@@ -245,8 +246,8 @@
         s = s.replace(/\\ln/g,"log");
         s = s.replace(/\\sqrt\\s*\\{([^{}]+)\\}/g, "sqrt($1)");
         s = s.replace(/\\frac\\s*\\{([^{}]+)\\}\\s*\\{([^{}]+)\\}/g, "($1)/($2)");
-        s = s.replace(/\\{/g,"(").replace(/\\}/g,")");
-        s = s.replace(/\\s+|\\,/g,"");
+        s = s.replace(/\{/g,"(").replace(/\}/g,")");
+        s = s.replace(/\s+|\\,/g,"");
 
         // accept y(x), y(), x()
         s = s.replace(/\by\s*\(\s*x\s*\)/gi, 'y');
@@ -469,8 +470,11 @@
     // --- Nullclines: y'(x,y) = 0 ---
     function drawNullclines() {
       if (!showNull) return;
-      const col = getComputedStyle(document.documentElement).getPropertyValue('--nullcline').trim() || '#f59e0b';
-      ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+      // dashed, light-pink nullclines
+      const col = getComputedStyle(document.documentElement).getPropertyValue('--nullcline').trim() || '#f9a8d4';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6,4]);
 
       const gx = 60, gy = 60;
       const xs = new Array(gx).fill(0).map((_,i)=> xmin + i*(xmax-xmin)/(gx-1));
@@ -534,6 +538,9 @@
           }
         }
       }
+
+      // reset dash so other drawings are solid
+      ctx.setLineDash([]);
     }
 
     // --- Equilibria (autonomous only) ---
@@ -623,26 +630,13 @@
       nxVal.textContent = String(nx);
       nyVal.textContent = String(ny);
       alenVal.textContent = String(L);
-      /* if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
-      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || '-tan(x)*y') + ' [' + modeInfo + ']'; } */
-      
-if (parseError) {
-  statusEl.className = 'status error';
-  parsedEl.textContent = parseError;
-} else {
-  statusEl.className = 'status';
-  const shown = usingPlain ? latex : (mqField ? mqField.latex() : latex); // מה שמוצג למשתמש
-  parsedEl.innerHTML = '\\(' + shown + '\\) <span style="opacity:.7">[' + modeInfo + ']</span>';
-  if (window.MathJax && MathJax.typesetPromise) {
-    MathJax.typesetPromise([parsedEl]);
-  }
-}
-
+      if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
+      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || '-tan(x)*y') + ' [' + modeInfo + ']'; }
       
       drawGrid();
       if (showNull) drawNullclines();
       drawSlopeField();
-      /* if (showEq) drawEquilibria(); */
+      if (showEq) drawEquilibria();
       if (showSol) {
         drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa');
         drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399');
@@ -701,8 +695,8 @@ if (parseError) {
     stepInput.addEventListener('input', () => { step = parseFloat(stepInput.value); render(); });
     resetPoints.addEventListener('click', () => { y0s = [1,2,-1]; render(); });
     resetEqn.addEventListener('click', () => {
-      latex = "-tan(x)*y";                                // CHANGED: reset to default
-      if (!usingPlain && window.MathQuill && mqField) mqField.latex("-\\tan(x)\\,y");
+      latex = "-tan(x)*y";
+      if (!usingPlain && window.MathQuill && mqField) mqField.latex(latex);
       if (usingPlain) plain.value = "-tan(x)*y";
       rebuildFunction(); render();
     });
@@ -712,7 +706,7 @@ if (parseError) {
     alenInput.addEventListener('input', () => { L = parseInt(alenInput.value,10); render(); });
     showSolInput.addEventListener('change', () => { showSol = showSolInput.checked; render(); });
     showNullInput.addEventListener('change', () => { showNull = showNullInput.checked; render(); });
-    /* showEqInput.addEventListener('change', () => { showEq = showEqInput.checked; render(); }); */
+    showEqInput.addEventListener('change', () => { showEq = showEqInput.checked; render(); });
 
     // Editor (MathQuill or plain)
     const mqSpan = document.getElementById('mq');
@@ -726,7 +720,7 @@ if (parseError) {
             spaceBehavesLikeTab: true,
             handlers: { edit: () => { latex = mqField.latex(); rebuildFunction(); render(); } }
           });
-          mqField.latex("-\\tan(x)\\,y");               // CHANGED: initial for MQ
+          mqField.latex(latex);
           usingPlain = false;
           plain.style.display = 'none';
           note.textContent = '';
@@ -737,7 +731,7 @@ if (parseError) {
       usingPlain = true;
       mqSpan.style.display = 'none';
       plain.style.display = 'inline-block';
-      plain.value = "-tan(x)*y";                         // CHANGED: initial for plain
+      plain.value = '-tan(x)*y';
       plain.addEventListener('input', () => { latex = plain.value; rebuildFunction(); render(); });
       note.textContent = 'MathQuill unavailable — using plain text input (type e.g. sin(y), cos(x+y), sqrt(1+y^2)).';
       rebuildFunction(); render();
