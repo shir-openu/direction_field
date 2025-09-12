@@ -2,52 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slope Field</title>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com/" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.10.1/mathquill.min.css">
   <style>
     :root {
-      --bg: #ffffff;
-      --panel: #ffffff;
-      --ink: #111827;
-      --muted: #6b7280;
-      --grid: #e5e7eb;
-      --axis: #1f2937;
-      --field: #475569;
-      --nullcline: #f59e0b; /* amber */
-      --eq-stable: #10b981;  /* emerald */
-      --eq-unstable: #ef4444;/* red */
-      --eq-neutral: #6b7280; /* gray */
-      --c1: #2563eb;
-      --c2: #16a34a;
-      --c3: #dc2626;
-      --handle-outline: #ffffff;
+      /* ---- Dark palette (navy) ---- */
+      --bg: #0e1424;            /* page background */
+      --panel: #111827;         /* canvas/card bg */
+      --ink: #e5e7eb;           /* primary text */
+      --muted: #9aa6b2;         /* secondary text */
+      --grid: #1f2a3a;          /* grid lines */
+      --axis: #e5e7eb;          /* axes */
+      --field: #9fb3c8;         /* slope field */
+      --nullcline: #f59e0b;     /* amber */
+      --eq-stable: #10b981;     /* emerald */
+      --eq-unstable: #ef4444;   /* red */
+      --eq-neutral: #a1a1aa;    /* zinc-400 */
+      --c1: #60a5fa;            /* blue-400 */
+      --c2: #34d399;            /* green-400 */
+      --c3: #f87171;            /* red-400 */
+      --handle-outline: #0e1424;/* ring same as bg */
+
+      --control-bg: #0f172a;    /* controls bg */
+      --control-border: #233044;/* controls border */
+      --control-hover: #1b2638; /* controls hover */
     }
+
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans"; color: var(--ink); background: var(--bg); }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      color: var(--ink);
+      background: var(--bg);
+    }
     .wrap { max-width: 1160px; margin: 24px auto; padding: 0 16px; }
     h1 { font-size: 24px; margin: 0 0 8px; }
     .muted { color: var(--muted); font-size: 14px; }
     .bar { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin:16px 0; }
-    .eqn { display:flex; align-items:center; gap:8px; padding: 6px 10px; border:1px solid #d1d5db; border-radius:10px; background:#fff; min-width:260px; }
+
+    .eqn {
+      display:flex; align-items:center; gap:8px;
+      padding: 6px 10px; border:1px solid var(--control-border);
+      border-radius:10px; background: var(--control-bg); min-width:260px; color: var(--ink);
+    }
     .mq-editable-field, .mq-math-mode { min-height: 32px; }
-    .plain { min-width: 240px; border: none; outline: none; font-size: 16px; }
+    .plain {
+      min-width: 240px; border: none; outline: none; font-size: 16px;
+      background: transparent; color: var(--ink);
+    }
+
     .slider { display:flex; align-items:center; gap:8px; color: var(--muted); font-size: 14px; }
     input[type="range"] { width: 170px; }
-    .legend { display:flex; gap:16px; font-size: 14px; align-items:center; }
+
+    .legend { display:flex; gap:16px; font-size: 14px; align-items:center; color: var(--muted); }
     .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
-    .panel { background: var(--panel); border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); overflow:hidden; }
-    .btn { background:#f3f4f6; color:#111827; border:1px solid #e5e7eb; padding:6px 10px; border-radius:10px; cursor:pointer; }
-    .btn:hover { background:#e5e7eb; }
+
+    .panel {
+      background: var(--panel); border:1px solid var(--control-border);
+      border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,0.35); overflow:hidden;
+    }
+
+    .btn {
+      background: var(--control-bg); color: var(--ink);
+      border:1px solid var(--control-border); padding:6px 10px; border-radius:10px; cursor:pointer;
+    }
+    .btn:hover { background: var(--control-hover); }
+
     .status { font-size:12px; color: var(--muted); margin-top: 4px; }
-    .status.error { color:#b91c1c; }
+    .status.error { color:#fca5a5; }
+
     canvas { display:block; width: 100%; height: auto; touch-action: none; }
+
     .footer { margin-top: 12px; font-size:12px; color:var(--muted); }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .select, .checkbox { padding:6px 10px; border:1px solid #d1d5db; border-radius:10px; background:#fff; font-size: 14px; }
+    code {
+      color:#fbbf24;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .select, .checkbox {
+      padding:6px 10px; border:1px solid var(--control-border);
+      border-radius:10px; background: var(--control-bg); color: var(--ink); font-size: 14px;
+    }
     .group { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
-    label.chk { display:flex; align-items:center; gap:8px; user-select:none; padding: 6px 10px; border:1px solid #d1d5db; border-radius:10px; background:#fff; }
+    label.chk {
+      display:flex; align-items:center; gap:8px; user-select:none;
+      padding: 6px 10px; border:1px solid var(--control-border); border-radius:10px;
+      background: var(--control-bg); color: var(--ink);
+    }
     label small { color: var(--muted); }
   </style>
 </head>
@@ -59,16 +102,16 @@
     <div class="bar">
       <div class="eqn">
         <span>dy/dx =</span>
-        <span id="mq"></span>
-        <input id="plain" class="plain" placeholder="sin(y)" style="display:none" />
+        <span id="mq" style="display: none;"></span>
+        <input id="plain" class="plain" placeholder="sin(y)" style="display: inline-block;">
       </div>
       <div class="slider">
         <label for="step">Step resolution (approx.)</label>
-        <input id="step" type="range" min="0.005" max="0.08" step="0.005" value="0.02"/>
+        <input id="step" type="range" min="0.005" max="0.08" step="0.005" value="0.02">
         <span id="stepVal">0.020</span>
       </div>
       <div>
-        <label for="arrowMode" style="color:#374151; font-size:14px; margin-right:6px;">Arrowheads</label>
+        <label for="arrowMode" style="color:var(--muted); font-size:14px; margin-right:6px;">Arrowheads</label>
         <select id="arrowMode" class="select">
           <option value="forward" selected>Forward (+x)</option>
           <option value="backward">Backward (−x)</option>
@@ -86,25 +129,25 @@
     <div class="bar group">
       <div class="slider">
         <label for="nx">Density X</label>
-        <input id="nx" type="range" min="11" max="51" step="2" value="21" />
+        <input id="nx" type="range" min="11" max="51" step="2" value="21">
         <span id="nxVal">21</span>
       </div>
       <div class="slider">
         <label for="ny">Density Y</label>
-        <input id="ny" type="range" min="13" max="61" step="2" value="25" />
+        <input id="ny" type="range" min="13" max="61" step="2" value="25">
         <span id="nyVal">25</span>
       </div>
       <div class="slider">
         <label for="alen">Arrow length</label>
-        <input id="alen" type="range" min="6" max="28" step="1" value="16" />
+        <input id="alen" type="range" min="6" max="28" step="1" value="16">
         <span id="alenVal">16</span><span class="muted">px</span>
       </div>
-      <label class="chk"><input id="showSol" type="checkbox" checked/> Show solutions</label>
-      <label class="chk"><input id="showNull" type="checkbox" checked/> Show nullclines <small>(y'(x,y)=0)</small></label>
-      <label class="chk"><input id="showEq" type="checkbox" checked/> Show equilibria <small>(autonomous only)</small></label>
+      <label class="chk"><input id="showSol" type="checkbox" checked> Show solutions</label>
+      <label class="chk"><input id="showNull" type="checkbox" checked> Show nullclines <small>(y'(x,y)=0)</small></label>
+      <label class="chk"><input id="showEq" type="checkbox" checked> Show equilibria <small>(autonomous only)</small></label>
     </div>
 
-    <div class="status" id="status">Parsed as: <code id="parsed">sin(y)</code></div>
+    <div class="status" id="status">Parsed as: <code id="parsed">sin(y) [explicit f(x,y)]</code></div>
 
     <div class="panel">
       <canvas id="canvas" width="980" height="640"></canvas>
@@ -113,7 +156,7 @@
     <div class="bar" style="gap:8px; margin-top:10px;">
       <button class="btn" id="resetPoints">Reset initial points</button>
       <button class="btn" id="resetEqn">Reset equation</button>
-      <span class="status" id="note" aria-live="polite"></span>
+      <span class="status" id="note" aria-live="polite">MathQuill unavailable — using plain text input (type e.g. sin(y), cos(x+y), sqrt(1+y^2)).</span>
     </div>
 
     <div class="footer">
@@ -132,8 +175,8 @@
     let y0s = [1, 2, -1];
     let step = 0.02;
     let parseError = "";
-    let latex = "\\\\sin(y)";
-    let compiledF = (x,y) => Math.sin(y);
+    let latex = "-tan(x)*y";                        // CHANGED: default
+    let compiledF = (x,y) => -Math.tan(x)*y;        // CHANGED: default
     let usingPlain = false;
     let arrowMode = 'forward';
     let nx = 21, ny = 25, L = 16;
@@ -187,16 +230,16 @@
       try {
         let s = (lx || "").trim();
         if (!s) return "";
-        s = s.replace(/\\\\left|\\\\right/g,"");
-        s = s.replace(/\\\\cdot|\\\\times/g,"*");
-        s = s.replace(/\\\\pi/g,"pi");
-        s = s.replace(/\\\\sin/g,"sin");
-        s = s.replace(/\\\\cos/g,"cos");
-        s = s.replace(/\\\\tan/g,"tan");
-        s = s.replace(/\\\\exp/g,"exp");
-        s = s.replace(/\\\\ln/g,"log");
-        s = s.replace(/\\\\sqrt\\s*\\{([^{}]+)\\}/g, "sqrt($1)");
-        s = s.replace(/\\\\frac\\s*\\{([^{}]+)\\}\\s*\\{([^{}]+)\\}/g, "($1)/($2)");
+        s = s.replace(/\\left|\\right/g,"");
+        s = s.replace(/\\cdot|\\times/g,"*");
+        s = s.replace(/\\pi/g,"pi");
+        s = s.replace(/\\sin/g,"sin");
+        s = s.replace(/\\cos/g,"cos");
+        s = s.replace(/\\tan/g,"tan");
+        s = s.replace(/\\exp/g,"exp");
+        s = s.replace(/\\ln/g,"log");
+        s = s.replace(/\\sqrt\\s*\\{([^{}]+)\\}/g, "sqrt($1)");
+        s = s.replace(/\\frac\\s*\\{([^{}]+)\\}\\s*\\{([^{}]+)\\}/g, "($1)/($2)");
         s = s.replace(/\\{/g,"(").replace(/\\}/g,")");
         s = s.replace(/\\s+|\\,/g,"");
 
@@ -280,7 +323,7 @@
           parseError = "";
           modeInfo = "explicit f(x,y)";
           statusEl.className = 'status';
-          parsedEl.textContent = exprRaw || 'sin(y)';
+          parsedEl.textContent = exprRaw || '-tan(x)*y';
           return;
         } else {
           compiledF = compileImplicit(exprRaw);
@@ -297,7 +340,7 @@
       }
     }
 
-    // approx
+    // approx (RK4 core)
     function approxStep(f,x,y,h){
       const k1 = f(x,y);
       const k2 = f(x + h/2, y + (h/2)*k1);
@@ -326,12 +369,14 @@
 
     // Drawing
     function drawGrid() {
+      // dark panel background
+      const panelCol = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#111827';
       ctx.clearRect(0,0,width,height);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = panelCol;
       ctx.fillRect(0,0,width,height);
 
       ctx.lineWidth = 1;
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || '#e5e7eb';
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || '#1f2a3a';
       ctx.beginPath();
       for (let gx = Math.ceil(xmin); gx <= Math.floor(xmax); gx++) {
         const px = xToPx(gx);
@@ -343,14 +388,14 @@
       }
       ctx.stroke();
 
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--axis').trim() || '#1f2937';
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--axis').trim() || '#e5e7eb';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       const yAxisX = xToPx(0); ctx.moveTo(yAxisX,0); ctx.lineTo(yAxisX,height);
       const xAxisY = yToPx(0); ctx.moveTo(0,xAxisY); ctx.lineTo(width,xAxisY);
       ctx.stroke();
 
-      ctx.fillStyle = '#374151';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#e5e7eb';
       ctx.font = '14px ui-sans-serif, system-ui, -apple-system';
       ctx.textAlign = 'center';
       for (let gx = Math.ceil(xmin); gx <= Math.floor(xmax); gx++) {
@@ -385,7 +430,7 @@
     }
 
     function drawSlopeField() {
-      const col = getComputedStyle(document.documentElement).getPropertyValue('--field').trim() || '#475569';
+      const col = getComputedStyle(document.documentElement).getPropertyValue('--field').trim() || '#9fb3c8';
       const stepx = (xmax - xmin) / (nx - 1);
       const stepy = (ymax - ymin) / (ny - 1);
       const mCap = 1e3;
@@ -540,7 +585,7 @@
       if (!eqs.length) return;
       const colStable = getComputedStyle(document.documentElement).getPropertyValue('--eq-stable').trim() || '#10b981';
       const colUnstable = getComputedStyle(document.documentElement).getPropertyValue('--eq-unstable').trim() || '#ef4444';
-      const colNeutral = getComputedStyle(document.documentElement).getPropertyValue('--eq-neutral').trim() || '#6b7280';
+      const colNeutral = getComputedStyle(document.documentElement).getPropertyValue('--eq-neutral').trim() || '#a1a1aa';
       const hx = xToPx(0);
       const dash = [6,4];
 
@@ -574,19 +619,19 @@
       nyVal.textContent = String(ny);
       alenVal.textContent = String(L);
       if (parseError) { statusEl.className = 'status error'; parsedEl.textContent = parseError; }
-      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || 'sin(y)') + ' [' + modeInfo + ']'; }
+      else { statusEl.className = 'status'; parsedEl.textContent = (latexToExpr(latex) || latex || '-tan(x)*y') + ' [' + modeInfo + ']'; }
       
       drawGrid();
       if (showNull) drawNullclines();
       drawSlopeField();
       if (showEq) drawEquilibria();
       if (showSol) {
-        drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#2563eb');
-        drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#16a34a');
-        drawSolution(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#dc2626');
-        drawHandle(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#2563eb');
-        drawHandle(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#16a34a');
-        drawHandle(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#dc2626');
+        drawSolution(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa');
+        drawSolution(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399');
+        drawSolution(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#f87171');
+        drawHandle(y0s[0], getComputedStyle(document.documentElement).getPropertyValue('--c1').trim() || '#60a5fa');
+        drawHandle(y0s[1], getComputedStyle(document.documentElement).getPropertyValue('--c2').trim() || '#34d399');
+        drawHandle(y0s[2], getComputedStyle(document.documentElement).getPropertyValue('--c3').trim() || '#f87171');
       }
     }
 
@@ -607,7 +652,7 @@
       const hx = xToPx(0), hy = yToPx(y0), r = 6;
       ctx.fillStyle = color;
       ctx.beginPath(); ctx.arc(hx,hy,r,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--handle-outline').trim() || '#ffffff';
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--handle-outline').trim() || '#0e1424';
       ctx.lineWidth = 1.5; ctx.stroke();
     }
 
@@ -638,9 +683,9 @@
     stepInput.addEventListener('input', () => { step = parseFloat(stepInput.value); render(); });
     resetPoints.addEventListener('click', () => { y0s = [1,2,-1]; render(); });
     resetEqn.addEventListener('click', () => {
-      latex = "\\\\sin(y)";
-      if (!usingPlain && window.MathQuill && mqField) mqField.latex(latex);
-      if (usingPlain) plain.value = "sin(y)";
+      latex = "-tan(x)*y";                                // CHANGED: reset to default
+      if (!usingPlain && window.MathQuill && mqField) mqField.latex("-\\tan(x)\\,y");
+      if (usingPlain) plain.value = "-tan(x)*y";
       rebuildFunction(); render();
     });
     arrowSel.addEventListener('change', () => { arrowMode = arrowSel.value; render(); });
@@ -663,7 +708,7 @@
             spaceBehavesLikeTab: true,
             handlers: { edit: () => { latex = mqField.latex(); rebuildFunction(); render(); } }
           });
-          mqField.latex(latex);
+          mqField.latex("-\\tan(x)\\,y");               // CHANGED: initial for MQ
           usingPlain = false;
           plain.style.display = 'none';
           note.textContent = '';
@@ -674,7 +719,7 @@
       usingPlain = true;
       mqSpan.style.display = 'none';
       plain.style.display = 'inline-block';
-      plain.value = 'sin(y)';
+      plain.value = "-tan(x)*y";                         // CHANGED: initial for plain
       plain.addEventListener('input', () => { latex = plain.value; rebuildFunction(); render(); });
       note.textContent = 'MathQuill unavailable — using plain text input (type e.g. sin(y), cos(x+y), sqrt(1+y^2)).';
       rebuildFunction(); render();
