@@ -299,8 +299,8 @@
       }
     }
 
-    // RK4
-    function rk4Step(f,x,y,h){
+    // approx_
+    function approx_Step(f,x,y,h){
       const k1 = f(x,y);
       const k2 = f(x + h/2, y + (h/2)*k1);
       const k3 = f(x + h/2, y + (h/2)*k2);
@@ -312,14 +312,14 @@
       let x = x0, y = y0;
       for (let i=0;i<20000 && x < xMax - 1e-12;i++){
         const next = Math.min(x + h, xMax), hh = next - x;
-        y = rk4Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
+        y = approx_Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
         xs.push(x); ys.push(y);
       }
       const xs2=[], ys2=[];
       x = x0; y = y0;
       for (let i=0;i<20000 && x > xMin + 1e-12;i++){
         const next = Math.max(x - h, xMin), hh = next - x;
-        y = rk4Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
+        y = approx_Step(f, x, y, hh); x = next; if (!Number.isFinite(y)) break;
         xs2.push(x); ys2.push(y);
       }
       xs2.reverse(); ys2.reverse();
