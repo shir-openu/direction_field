@@ -130,6 +130,7 @@
       padding: 14px 16px;
       margin-bottom: 12px;
       animation: fadeInDown 0.6s ease-out 0.1s both;
+      position: relative; z-index: 50; /* above toolbar so autocomplete dropdown shows */
     }
     .eq-input-wrap {
       flex: 1; min-width: 260px;
@@ -273,6 +274,79 @@
       font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
       padding: 3px 8px; border-radius: 6px;
       background: var(--glass); color: var(--muted); white-space: nowrap;
+    }
+
+    /* ===== AUTOCOMPLETE DROPDOWN ===== */
+    .ac-wrap {
+      position: relative;
+      flex: 1; min-width: 180px;
+    }
+    .ac-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px); left: 0; right: 0; z-index: 200;
+      max-height: 320px; overflow-y: auto;
+      background: var(--panel-solid);
+      border: 1.5px solid var(--accent);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+      animation: fadeIn 0.12s ease-out;
+    }
+    .ac-dropdown.open { display: block; }
+    .ac-cats {
+      display: flex; gap: 5px; padding: 8px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--control-border);
+      flex-shrink: 0;
+    }
+    .ac-cat {
+      flex-shrink: 0;
+      font-size: 10px; font-weight: 600;
+      padding: 4px 10px;
+      border: 1px solid var(--control-border);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .ac-cat:hover { border-color: var(--accent); }
+    .ac-cat.active {
+      background: rgba(245,158,11,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .ac-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      border: none; background: none; width: 100%; text-align: left;
+      color: var(--ink); font-size: 13px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background 0.1s;
+    }
+    .ac-item:hover, .ac-item.selected {
+      background: rgba(245,158,11,0.12);
+      border-left-color: var(--accent);
+    }
+    .ac-item-name {
+      font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px;
+      margin-bottom: 2px; color: var(--ink);
+    }
+    .ac-item-desc { font-size: 11px; color: var(--muted); }
+    .ac-item-badge {
+      font-size: 9px; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px;
+      background: var(--glass); color: var(--muted);
+      margin-left: 8px; white-space: nowrap;
+    }
+    .ac-hint {
+      padding: 6px 14px;
+      font-size: 11px; font-style: italic;
+      color: var(--accent);
+      border-top: 1px solid var(--control-border);
+      background: rgba(245,158,11,0.05);
     }
 
     /* ===== COLLAPSIBLE MOBILE CONTROLS ===== */
@@ -423,7 +497,14 @@
       <div class="eq-input-wrap">
         <span class="eq-label">y' =</span>
         <span id="mq" style="display:none"></span>
-        <input id="plain" class="plain" placeholder="y' + tan(x)*y = x*sin(2*x)" spellcheck="false" autocomplete="off" />
+        <div class="ac-wrap">
+          <input id="plain" class="plain" placeholder="y' + tan(x)*y = x*sin(2*x)" spellcheck="false" autocomplete="off" />
+          <div class="ac-dropdown" id="acDropdown">
+            <div class="ac-cats" id="acCats"></div>
+            <div id="acItems"></div>
+            <div class="ac-hint" id="acHint" style="display:none"></div>
+          </div>
+        </div>
       </div>
       <div class="eq-rendered" id="eqRendered"></div>
     </div>
@@ -586,6 +667,253 @@
     const presetsDropdown = document.getElementById('presetsDropdown');
     const mobileToggle = document.getElementById('mobileToggle');
     const mobileToggleText = document.getElementById('mobileToggleText');
+
+    /* ===== AUTOCOMPLETE LIBRARY ===== */
+    const AC_ENTRIES = [
+      // Functions
+      {trigger:'sin', display:'sin(·)', insert:'sin()', desc:'Sine function', cat:'Functions', tags:['sine'], complexity:'basic', cursorBack:1},
+      {trigger:'cos', display:'cos(·)', insert:'cos()', desc:'Cosine function', cat:'Functions', tags:['cosine'], complexity:'basic', cursorBack:1},
+      {trigger:'tan', display:'tan(·)', insert:'tan()', desc:'Tangent function', cat:'Functions', tags:['tangent'], complexity:'basic', cursorBack:1},
+      {trigger:'asin', display:'arcsin(·)', insert:'asin()', desc:'Inverse sine', cat:'Functions', tags:['arcsin'], complexity:'intermediate', cursorBack:1},
+      {trigger:'acos', display:'arccos(·)', insert:'acos()', desc:'Inverse cosine', cat:'Functions', tags:['arccos'], complexity:'intermediate', cursorBack:1},
+      {trigger:'atan', display:'arctan(·)', insert:'atan()', desc:'Inverse tangent', cat:'Functions', tags:['arctan'], complexity:'intermediate', cursorBack:1},
+      {trigger:'sinh', display:'sinh(·)', insert:'sinh()', desc:'Hyperbolic sine', cat:'Functions', tags:['hyperbolic'], complexity:'intermediate', cursorBack:1},
+      {trigger:'cosh', display:'cosh(·)', insert:'cosh()', desc:'Hyperbolic cosine', cat:'Functions', tags:['hyperbolic'], complexity:'intermediate', cursorBack:1},
+      {trigger:'tanh', display:'tanh(·)', insert:'tanh()', desc:'Hyperbolic tangent', cat:'Functions', tags:['hyperbolic'], complexity:'intermediate', cursorBack:1},
+      {trigger:'exp', display:'exp(·)', insert:'exp()', desc:'Exponential e^x', cat:'Functions', tags:['e','euler','exponential'], complexity:'basic', cursorBack:1},
+      {trigger:'log', display:'ln(·)', insert:'log()', desc:'Natural logarithm', cat:'Functions', tags:['ln'], complexity:'basic', cursorBack:1},
+      {trigger:'ln', display:'ln(·)', insert:'log()', desc:'Natural logarithm', cat:'Functions', tags:['log'], complexity:'basic', cursorBack:1},
+      {trigger:'sqrt', display:'√(·)', insert:'sqrt()', desc:'Square root', cat:'Functions', tags:['root','radical'], complexity:'basic', cursorBack:1},
+      {trigger:'abs', display:'|·|', insert:'abs()', desc:'Absolute value', cat:'Functions', tags:['absolute','modulus'], complexity:'basic', cursorBack:1},
+      // Constants
+      {trigger:'pi', display:'π', insert:'pi', desc:'Pi ≈ 3.14159', cat:'Constants', tags:['3.14'], complexity:'basic', cursorBack:0},
+      {trigger:'e', display:'e', insert:'e', desc:"Euler's number ≈ 2.71828", cat:'Constants', tags:['euler'], complexity:'basic', cursorBack:0},
+      // Operators
+      {trigger:'^', display:'x^n', insert:'^', desc:'Exponentiation', cat:'Operators', tags:['power'], complexity:'basic', cursorBack:0},
+      {trigger:'frac', display:'a/b', insert:'/', desc:'Fraction', cat:'Operators', tags:['fraction','divide'], complexity:'basic', cursorBack:0},
+      // Classic ODEs
+      {trigger:'logistic', display:'Logistic: y(1-y)', insert:'y*(1-y)', desc:'Logistic growth', cat:'Classic ODEs', tags:['population','growth'], complexity:'basic', isFull:true},
+      {trigger:'decay', display:'Decay: -ky', insert:'-0.5*y', desc:'Exponential decay', cat:'Classic ODEs', tags:['radioactive'], complexity:'basic', isFull:true},
+      {trigger:'harmonic', display:'Harmonic: -y', insert:'-y', desc:'Simple harmonic oscillator', cat:'Classic ODEs', tags:['oscillator'], complexity:'basic', isFull:true},
+      {trigger:'bernoulli', display:'Bernoulli: y - y²', insert:'y - y^2', desc:'Bernoulli equation', cat:'Classic ODEs', tags:['nonlinear'], complexity:'intermediate', isFull:true},
+      {trigger:'separable', display:'Separable: x·y', insert:'x*y', desc:'Separable ODE', cat:'Classic ODEs', tags:['product'], complexity:'basic', isFull:true},
+      {trigger:'linear', display:'Linear: x + y', insert:'x + y', desc:'First-order linear', cat:'Classic ODEs', tags:['spiral'], complexity:'basic', isFull:true},
+      {trigger:'exact', display:'Exact: (2xy+3)+(x²-1)', insert:'(2*x*y+3)+(x^2-1)', desc:'Exact equation form', cat:'Classic ODEs', complexity:'intermediate', isFull:true},
+      {trigger:'homogeneous', display:'Homogeneous: y/x', insert:'y/x', desc:'Homogeneous equation', cat:'Classic ODEs', complexity:'intermediate', isFull:true},
+      // Trig
+      {trigger:'sincos', display:'sin(x)·cos(y)', insert:'sin(x)*cos(y)', desc:'Trigonometric product field', cat:'Trig / Oscillatory', tags:['periodic'], complexity:'basic', isFull:true},
+      {trigger:'periodic', display:'sin(x)+cos(y)', insert:'sin(x) + cos(y)', desc:'Periodic field sum', cat:'Trig / Oscillatory', complexity:'basic', isFull:true},
+      {trigger:'tanxy', display:'tan(x)·y', insert:'tan(x)*y', desc:'Tangent coefficient', cat:'Trig / Oscillatory', complexity:'intermediate', isFull:true},
+      {trigger:'duffing', display:'Duffing: y-y³+cos(x)', insert:'y - y^3 + cos(x)', desc:'Duffing oscillator', cat:'Trig / Oscillatory', tags:['chaos'], complexity:'advanced', isFull:true},
+      {trigger:'mathieu', display:'Mathieu: -(1+cos(x))y', insert:'-(1+cos(x))*y', desc:'Mathieu-type equation', cat:'Trig / Oscillatory', complexity:'advanced', isFull:true},
+      // Nonlinear
+      {trigger:'vanderpol', display:'Van der Pol', insert:'y - x^3/3 + x', desc:'Van der Pol oscillator', cat:'Nonlinear', tags:['limit cycle'], complexity:'advanced', isFull:true},
+      {trigger:'saddle', display:'Saddle: x - y', insert:'x - y', desc:'Saddle equilibrium', cat:'Nonlinear', tags:['equilibrium'], complexity:'basic', isFull:true},
+      {trigger:'spiral', display:'Spiral: x + y', insert:'x + y', desc:'Spiral source', cat:'Nonlinear', complexity:'basic', isFull:true},
+      {trigger:'node', display:'Node: -2y+x', insert:'-2*y + x', desc:'Stable node', cat:'Nonlinear', complexity:'intermediate', isFull:true},
+      {trigger:'center', display:'Center: -x/y', insert:'-x/y', desc:'Center equilibrium', cat:'Nonlinear', complexity:'intermediate', isFull:true},
+      {trigger:'limit', display:'Limit cycle', insert:'y - x*(x^2+y^2-1)', desc:'Limit cycle approximation', cat:'Nonlinear', complexity:'advanced', isFull:true},
+      {trigger:'pitchfork', display:'Pitchfork: y³-y', insert:'y^3 - y', desc:'Pitchfork bifurcation', cat:'Nonlinear', tags:['bifurcation'], complexity:'advanced', isFull:true},
+      {trigger:'transcritical', display:'Transcritical: y(1-y/x)', insert:'y*(1-y/x)', desc:'Transcritical bifurcation', cat:'Nonlinear', complexity:'advanced', isFull:true},
+      {trigger:'riccati', display:'Riccati: x²+y²', insert:'x^2 + y^2', desc:'Riccati-type equation', cat:'Nonlinear', complexity:'intermediate', isFull:true},
+      // Implicit
+      {trigger:'implicit', display:"y'+tan(x)y=xsin(2x)", insert:"y' + tan(x)*y = x*sin(2*x)", desc:'Implicit linear ODE', cat:'Implicit', complexity:'intermediate', isFull:true},
+      {trigger:'clairaut', display:"Clairaut: xy'-y+(y')²", insert:"x*y' - y + y'^2", desc:"Clairaut's equation", cat:'Implicit', tags:['singular'], complexity:'advanced', isFull:true},
+      // Engineering
+      {trigger:'rc', display:'RC circuit', insert:'-y + sin(x)', desc:'RC circuit with AC source', cat:'Engineering', tags:['electronics'], complexity:'intermediate', isFull:true},
+      {trigger:'rl', display:'RL circuit', insert:'(1-y)/x', desc:'RL circuit transient', cat:'Engineering', tags:['electronics'], complexity:'intermediate', isFull:true},
+      {trigger:'cooling', display:"Newton's cooling", insert:'-0.3*(y-1)', desc:"Newton's law of cooling", cat:'Engineering', tags:['thermal'], complexity:'basic', isFull:true},
+      {trigger:'mixing', display:'Mixing tank', insert:'(2 - 0.5*y)/10', desc:'Mixing tank problem', cat:'Engineering', complexity:'intermediate', isFull:true},
+      {trigger:'terminal', display:'Terminal velocity', insert:'9.8 - 0.1*y^2', desc:'Drag with v² term', cat:'Engineering', tags:['gravity'], complexity:'intermediate', isFull:true},
+      {trigger:'population', display:'Logistic w/ harvest', insert:'y*(1-y) - 0.2', desc:'Population with harvesting', cat:'Engineering', complexity:'intermediate', isFull:true},
+      {trigger:'lotka', display:'Lotka-Volterra (slice)', insert:'2*y - 0.5*y*x', desc:'Lotka-Volterra (1D)', cat:'Engineering', tags:['ecology'], complexity:'advanced', isFull:true},
+      {trigger:'sir', display:'SIR epidemic (I)', insert:'0.3*(1-y)*y - 0.1*y', desc:'SIR model (I component)', cat:'Engineering', tags:['epidemic'], complexity:'advanced', isFull:true},
+      {trigger:'chemical', display:'Chemical k(a-y)(b-y)', insert:'0.5*(1-y)*(2-y)', desc:'Second-order reaction', cat:'Engineering', complexity:'advanced', isFull:true},
+      // Advanced
+      {trigger:'abel', display:'Abel: y³+f(x)y+g(x)', insert:'y^3 + x*y + sin(x)', desc:'Abel equation 1st kind', cat:'Advanced', complexity:'research', isFull:true},
+      {trigger:'chini', display:'Chini: y³+sin(x)', insert:'y^3 + sin(x)', desc:'Chini equation', cat:'Advanced', complexity:'research', isFull:true},
+      {trigger:'blowup', display:'Blow-up: 1+y²', insert:'1 + y^2', desc:'Finite-time blow-up', cat:'Advanced', tags:['singularity'], complexity:'advanced', isFull:true},
+      {trigger:'singular', display:'Singular: y/x+x', insert:'y/x + x', desc:'Singular at x=0', cat:'Advanced', complexity:'intermediate', isFull:true},
+      {trigger:'stiff', display:'Stiff: -1000(y-sin(x))', insert:'-1000*(y-sin(x))', desc:'Stiff ODE example', cat:'Advanced', tags:['numerical'], complexity:'research', isFull:true},
+    ];
+
+    function acFindMatches(query, limit){
+      limit = limit || 6;
+      if(!query){
+        return AC_ENTRIES.filter(e => e.complexity === 'basic' && e.isFull).slice(0, limit);
+      }
+      const q = query.toLowerCase();
+      const scored = [];
+      for(const e of AC_ENTRIES){
+        let score = 0;
+        if(e.trigger.toLowerCase() === q) score = 100;
+        else if(e.trigger.toLowerCase().startsWith(q)) score = 80;
+        else if(e.display.toLowerCase().startsWith(q)) score = 60;
+        else if((e.tags||[]).some(t => t.toLowerCase().startsWith(q))) score = 50;
+        else if(e.trigger.toLowerCase().indexOf(q) >= 0) score = 40;
+        else if((e.tags||[]).some(t => t.toLowerCase().indexOf(q) >= 0)) score = 30;
+        else if(e.desc.toLowerCase().indexOf(q) >= 0) score = 20;
+        if(score > 0){
+          if(e.complexity === 'basic') score += 5;
+          scored.push({score, entry: e});
+        }
+      }
+      scored.sort((a,b) => b.score - a.score);
+      return scored.slice(0, limit).map(s => s.entry);
+    }
+
+    function acGetHint(input){
+      const s = input.toLowerCase().trim();
+      if(s.indexOf('e^') >= 0) return 'Tip: try exp(·) for better parsing';
+      if(s.endsWith('=') && s.indexOf("y'") < 0) return "Tip: implicit form needs y' or dy/dx on the left";
+      if(/\bln\(/.test(s)) return 'Tip: ln() is supported as log()';
+      return null;
+    }
+
+    /* ===== AUTOCOMPLETE UI ===== */
+    const acDropdown = document.getElementById('acDropdown');
+    const acCats = document.getElementById('acCats');
+    const acItems = document.getElementById('acItems');
+    const acHint = document.getElementById('acHint');
+    let acSelectedIndex = 0;
+    let acFilterCategory = 'All';
+    let acCurrentSuggestions = [];
+
+    const AC_CATEGORIES = ['All', 'Functions', 'Classic ODEs', 'Trig / Oscillatory', 'Nonlinear', 'Implicit', 'Engineering', 'Advanced'];
+
+    function acGetCurrentToken(){
+      const text = plain.value;
+      const cursor = plain.selectionStart || 0;
+      const upToCursor = text.substring(0, cursor);
+      const m = upToCursor.match(/[a-zA-Z'\/_]+$/);
+      return m ? m[0] : '';
+    }
+
+    function acRenderCats(){
+      acCats.innerHTML = '';
+      AC_CATEGORIES.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'ac-cat' + (cat === acFilterCategory ? ' active' : '');
+        btn.textContent = cat;
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          acFilterCategory = cat;
+          acUpdate();
+        });
+        acCats.appendChild(btn);
+      });
+    }
+
+    function acRenderItems(){
+      acItems.innerHTML = '';
+      acCurrentSuggestions.forEach((entry, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'ac-item' + (i === acSelectedIndex ? ' selected' : '');
+        btn.innerHTML = `
+          <div style="flex:1;min-width:0;">
+            <div class="ac-item-name">${entry.display}</div>
+            <div class="ac-item-desc">${entry.desc}</div>
+          </div>
+          <span class="ac-item-badge">${entry.complexity}</span>
+        `;
+        btn.addEventListener('mousedown', e => {
+          e.preventDefault();
+          acSelectEntry(entry);
+        });
+        acItems.appendChild(btn);
+      });
+    }
+
+    function acUpdate(){
+      const token = acGetCurrentToken();
+      const text = plain.value;
+      let suggestions;
+      if(token.length >= 2 || text.length === 0){
+        suggestions = acFindMatches(token, 6);
+        if(acFilterCategory !== 'All'){
+          suggestions = suggestions.filter(e => e.cat === acFilterCategory);
+        }
+      } else {
+        suggestions = [];
+      }
+      acCurrentSuggestions = suggestions;
+      acSelectedIndex = 0;
+
+      const hint = acGetHint(text);
+      if(hint){
+        acHint.textContent = hint;
+        acHint.style.display = 'block';
+      } else {
+        acHint.style.display = 'none';
+      }
+
+      if(suggestions.length > 0 || hint){
+        acRenderCats();
+        acRenderItems();
+        acDropdown.classList.add('open');
+      } else {
+        acDropdown.classList.remove('open');
+      }
+    }
+
+    function acSelectEntry(entry){
+      const text = plain.value;
+      const cursor = plain.selectionStart || 0;
+      let newText, newCursor;
+      if(entry.isFull){
+        newText = entry.insert;
+        newCursor = newText.length;
+      } else {
+        const token = acGetCurrentToken();
+        const beforeToken = text.substring(0, cursor - token.length);
+        const afterCursor = text.substring(cursor);
+        newText = beforeToken + entry.insert + afterCursor;
+        newCursor = (beforeToken + entry.insert).length - (entry.cursorBack || 0);
+      }
+      plain.value = newText;
+      plain.setSelectionRange(newCursor, newCursor);
+      latex = newText;
+      rebuildFunction();
+      renderKaTeX();
+      render();
+      acDropdown.classList.remove('open');
+      plain.focus();
+    }
+
+    function initAutocomplete(){
+      plain.addEventListener('input', acUpdate);
+      plain.addEventListener('focus', () => {
+        if(plain.value.length === 0) acUpdate();
+      });
+      plain.addEventListener('blur', () => {
+        // Delay so click on item still registers
+        setTimeout(() => acDropdown.classList.remove('open'), 200);
+      });
+      plain.addEventListener('keydown', e => {
+        if(!acDropdown.classList.contains('open')) return;
+        if(e.key === 'ArrowDown'){
+          e.preventDefault();
+          if(acCurrentSuggestions.length > 0){
+            acSelectedIndex = (acSelectedIndex + 1) % acCurrentSuggestions.length;
+            acRenderItems();
+          }
+        } else if(e.key === 'ArrowUp'){
+          e.preventDefault();
+          if(acCurrentSuggestions.length > 0){
+            acSelectedIndex = (acSelectedIndex - 1 + acCurrentSuggestions.length) % acCurrentSuggestions.length;
+            acRenderItems();
+          }
+        } else if(e.key === 'Enter' || e.key === 'Tab'){
+          if(acCurrentSuggestions.length > 0){
+            e.preventDefault();
+            acSelectEntry(acCurrentSuggestions[acSelectedIndex]);
+          }
+        } else if(e.key === 'Escape'){
+          acDropdown.classList.remove('open');
+        }
+      });
+    }
 
     /* ===== PRESETS ===== */
     const PRESETS = [
@@ -1549,6 +1877,7 @@
       setupCanvas();
       rebuildFunction();
       initEditor();
+      initAutocomplete();
       // Retry KaTeX render once loaded
       if(!window.katex) {
         const check = setInterval(() => {
