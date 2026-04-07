@@ -1018,9 +1018,17 @@
     /* Load from URL params */
     function loadFromURL(){
       const params = new URLSearchParams(location.search);
+      // SECURITY: sanitize eq param before piping into new Function()
+      // Whitelist: alphanumeric, math operators, parens, dots, primes, equals, spaces, backslash for LaTeX
+      const SAFE_EQ = /^[a-zA-Z0-9\s\+\-\*\/\^%\(\)\[\]\.,'_|=\\{}]+$/;
+      const BLOCKED = /alert|document|window|eval|Function|script|fetch|import|require|constructor|prototype|globalThis|process|console/i;
       if(params.has('eq')) {
-        latex = params.get('eq');
-        plain.value = latex;
+        const raw = params.get('eq');
+        if(raw.length <= 500 && SAFE_EQ.test(raw) && !BLOCKED.test(raw)) {
+          latex = raw;
+          plain.value = latex;
+        }
+        // silently ignore if rejected — no error shown to avoid leaking info
       }
       if(params.has('x0')) {
         const xs = params.get('x0').split(',').map(Number);
@@ -1030,7 +1038,10 @@
         const ys = params.get('y0').split(',').map(Number);
         if(ys.length === 3 && ys.every(Number.isFinite)) y0s = ys;
       }
-      if(params.has('arrows')) arrowMode = params.get('arrows');
+      if(params.has('arrows')) {
+        const allowed = ['forward','backward','both','none'];
+        if(allowed.includes(params.get('arrows'))) arrowMode = params.get('arrows');
+      }
     }
 
     /* ===== THEME ===== */
