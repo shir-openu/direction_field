@@ -172,6 +172,7 @@
       padding: 10px 16px;
       margin-bottom: 12px;
       animation: fadeInDown 0.6s ease-out 0.15s both;
+      position: relative; z-index: 40; /* above canvas so presets dropdown shows */
     }
     .tool-group {
       display: flex; align-items: center; gap: 6px;
@@ -248,36 +249,42 @@
     .status.error { color: #fca5a5; }
     .status code { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
 
-    /* ===== PRESETS PANEL ===== */
+    /* ===== TEMPLATES PANEL (presets) ===== */
     .presets-toggle { position: relative; }
     .presets-dropdown {
       display: none;
       position: absolute; top: calc(100% + 6px); left: 0; z-index: 100;
-      min-width: 320px; max-height: 360px; overflow-y: auto;
+      min-width: 380px; max-width: 420px; max-height: 70vh; overflow-y: auto;
       background: var(--panel-solid);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
-      padding: 8px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      padding: 4px 0;
       animation: fadeIn 0.15s ease-out;
     }
     .presets-dropdown.open { display: block; }
+    .preset-cat-header {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--accent);
+      padding: 10px 14px 4px;
+      margin-top: 4px;
+      border-top: 1px solid var(--control-border);
+      background: rgba(245, 158, 11, 0.04);
+    }
+    .preset-cat-header:first-child { border-top: none; margin-top: 0; }
     .preset-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 12px;
-      border-radius: 8px;
+      display: block;
+      padding: 6px 14px;
       cursor: pointer;
       transition: background var(--transition);
       border: none; background: none; width: 100%; text-align: left;
-      color: var(--ink); font-size: 13px;
+      color: var(--ink);
     }
-    .preset-item:hover { background: var(--glass); }
-    .preset-name { font-weight: 600; margin-bottom: 2px; }
-    .preset-eq { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
-    .preset-cat {
-      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
-      padding: 3px 8px; border-radius: 6px;
-      background: var(--glass); color: var(--muted); white-space: nowrap;
+    .preset-item:hover { background: rgba(245, 158, 11, 0.10); }
+    .preset-name { font-size: 12px; font-weight: 600; color: var(--ink); }
+    .preset-eq {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);
+      margin-top: 1px;
     }
 
     /* ===== AUTOCOMPLETE DROPDOWN (plain text style) ===== */
@@ -633,95 +640,37 @@
     const mobileToggle = document.getElementById('mobileToggle');
     const mobileToggleText = document.getElementById('mobileToggleText');
 
-    /* ===== AUTOCOMPLETE LIBRARY ===== */
+    /* ===== AUTOCOMPLETE LIBRARY (functions only — full ODEs are in PRESETS) ===== */
     const AC_ENTRIES = [
-      // Functions
-      {trigger:'sin', display:'sin(·)', insert:'sin()', desc:'Sine function', cat:'Functions', tags:['sine'], complexity:'basic', cursorBack:1},
-      {trigger:'cos', display:'cos(·)', insert:'cos()', desc:'Cosine function', cat:'Functions', tags:['cosine'], complexity:'basic', cursorBack:1},
-      {trigger:'tan', display:'tan(·)', insert:'tan()', desc:'Tangent function', cat:'Functions', tags:['tangent'], complexity:'basic', cursorBack:1},
-      {trigger:'asin', display:'arcsin(·)', insert:'asin()', desc:'Inverse sine', cat:'Functions', tags:['arcsin'], complexity:'intermediate', cursorBack:1},
-      {trigger:'acos', display:'arccos(·)', insert:'acos()', desc:'Inverse cosine', cat:'Functions', tags:['arccos'], complexity:'intermediate', cursorBack:1},
-      {trigger:'atan', display:'arctan(·)', insert:'atan()', desc:'Inverse tangent', cat:'Functions', tags:['arctan'], complexity:'intermediate', cursorBack:1},
-      {trigger:'sinh', display:'sinh(·)', insert:'sinh()', desc:'Hyperbolic sine', cat:'Functions', tags:['hyperbolic'], complexity:'intermediate', cursorBack:1},
-      {trigger:'cosh', display:'cosh(·)', insert:'cosh()', desc:'Hyperbolic cosine', cat:'Functions', tags:['hyperbolic'], complexity:'intermediate', cursorBack:1},
-      {trigger:'tanh', display:'tanh(·)', insert:'tanh()', desc:'Hyperbolic tangent', cat:'Functions', tags:['hyperbolic'], complexity:'intermediate', cursorBack:1},
-      {trigger:'exp', display:'exp(·)', insert:'exp()', desc:'Exponential e^x', cat:'Functions', tags:['e','euler','exponential'], complexity:'basic', cursorBack:1},
-      {trigger:'log', display:'ln(·)', insert:'log()', desc:'Natural logarithm', cat:'Functions', tags:['ln'], complexity:'basic', cursorBack:1},
-      {trigger:'ln', display:'ln(·)', insert:'log()', desc:'Natural logarithm', cat:'Functions', tags:['log'], complexity:'basic', cursorBack:1},
-      {trigger:'sqrt', display:'√(·)', insert:'sqrt()', desc:'Square root', cat:'Functions', tags:['root','radical'], complexity:'basic', cursorBack:1},
-      {trigger:'abs', display:'|·|', insert:'abs()', desc:'Absolute value', cat:'Functions', tags:['absolute','modulus'], complexity:'basic', cursorBack:1},
-      // Constants
-      {trigger:'pi', display:'π', insert:'pi', desc:'Pi ≈ 3.14159', cat:'Constants', tags:['3.14'], complexity:'basic', cursorBack:0},
-      {trigger:'e', display:'e', insert:'e', desc:"Euler's number ≈ 2.71828", cat:'Constants', tags:['euler'], complexity:'basic', cursorBack:0},
-      // Operators
-      {trigger:'^', display:'x^n', insert:'^', desc:'Exponentiation', cat:'Operators', tags:['power'], complexity:'basic', cursorBack:0},
-      {trigger:'frac', display:'a/b', insert:'/', desc:'Fraction', cat:'Operators', tags:['fraction','divide'], complexity:'basic', cursorBack:0},
-      // Classic ODEs
-      {trigger:'logistic', display:'Logistic: y(1-y)', insert:'y*(1-y)', desc:'Logistic growth', cat:'Classic ODEs', tags:['population','growth'], complexity:'basic', isFull:true},
-      {trigger:'decay', display:'Decay: -ky', insert:'-0.5*y', desc:'Exponential decay', cat:'Classic ODEs', tags:['radioactive'], complexity:'basic', isFull:true},
-      {trigger:'harmonic', display:'Harmonic: -y', insert:'-y', desc:'Simple harmonic oscillator', cat:'Classic ODEs', tags:['oscillator'], complexity:'basic', isFull:true},
-      {trigger:'bernoulli', display:'Bernoulli: y - y²', insert:'y - y^2', desc:'Bernoulli equation', cat:'Classic ODEs', tags:['nonlinear'], complexity:'intermediate', isFull:true},
-      {trigger:'separable', display:'Separable: x·y', insert:'x*y', desc:'Separable ODE', cat:'Classic ODEs', tags:['product'], complexity:'basic', isFull:true},
-      {trigger:'linear', display:'Linear: x + y', insert:'x + y', desc:'First-order linear', cat:'Classic ODEs', tags:['spiral'], complexity:'basic', isFull:true},
-      {trigger:'exact', display:'Exact: (2xy+3)+(x²-1)', insert:'(2*x*y+3)+(x^2-1)', desc:'Exact equation form', cat:'Classic ODEs', complexity:'intermediate', isFull:true},
-      {trigger:'homogeneous', display:'Homogeneous: y/x', insert:'y/x', desc:'Homogeneous equation', cat:'Classic ODEs', complexity:'intermediate', isFull:true},
-      // Trig
-      {trigger:'sincos', display:'sin(x)·cos(y)', insert:'sin(x)*cos(y)', desc:'Trigonometric product field', cat:'Trig / Oscillatory', tags:['periodic'], complexity:'basic', isFull:true},
-      {trigger:'periodic', display:'sin(x)+cos(y)', insert:'sin(x) + cos(y)', desc:'Periodic field sum', cat:'Trig / Oscillatory', complexity:'basic', isFull:true},
-      {trigger:'tanxy', display:'tan(x)·y', insert:'tan(x)*y', desc:'Tangent coefficient', cat:'Trig / Oscillatory', complexity:'intermediate', isFull:true},
-      {trigger:'duffing', display:'Duffing: y-y³+cos(x)', insert:'y - y^3 + cos(x)', desc:'Duffing oscillator', cat:'Trig / Oscillatory', tags:['chaos'], complexity:'advanced', isFull:true},
-      {trigger:'mathieu', display:'Mathieu: -(1+cos(x))y', insert:'-(1+cos(x))*y', desc:'Mathieu-type equation', cat:'Trig / Oscillatory', complexity:'advanced', isFull:true},
-      // Nonlinear
-      {trigger:'vanderpol', display:'Van der Pol', insert:'y - x^3/3 + x', desc:'Van der Pol oscillator', cat:'Nonlinear', tags:['limit cycle'], complexity:'advanced', isFull:true},
-      {trigger:'saddle', display:'Saddle: x - y', insert:'x - y', desc:'Saddle equilibrium', cat:'Nonlinear', tags:['equilibrium'], complexity:'basic', isFull:true},
-      {trigger:'spiral', display:'Spiral: x + y', insert:'x + y', desc:'Spiral source', cat:'Nonlinear', complexity:'basic', isFull:true},
-      {trigger:'node', display:'Node: -2y+x', insert:'-2*y + x', desc:'Stable node', cat:'Nonlinear', complexity:'intermediate', isFull:true},
-      {trigger:'center', display:'Center: -x/y', insert:'-x/y', desc:'Center equilibrium', cat:'Nonlinear', complexity:'intermediate', isFull:true},
-      {trigger:'limit', display:'Limit cycle', insert:'y - x*(x^2+y^2-1)', desc:'Limit cycle approximation', cat:'Nonlinear', complexity:'advanced', isFull:true},
-      {trigger:'pitchfork', display:'Pitchfork: y³-y', insert:'y^3 - y', desc:'Pitchfork bifurcation', cat:'Nonlinear', tags:['bifurcation'], complexity:'advanced', isFull:true},
-      {trigger:'transcritical', display:'Transcritical: y(1-y/x)', insert:'y*(1-y/x)', desc:'Transcritical bifurcation', cat:'Nonlinear', complexity:'advanced', isFull:true},
-      {trigger:'riccati', display:'Riccati: x²+y²', insert:'x^2 + y^2', desc:'Riccati-type equation', cat:'Nonlinear', complexity:'intermediate', isFull:true},
-      // Implicit
-      {trigger:'implicit', display:"y'+tan(x)y=xsin(2x)", insert:"y' + tan(x)*y = x*sin(2*x)", desc:'Implicit linear ODE', cat:'Implicit', complexity:'intermediate', isFull:true},
-      {trigger:'clairaut', display:"Clairaut: xy'-y+(y')²", insert:"x*y' - y + y'^2", desc:"Clairaut's equation", cat:'Implicit', tags:['singular'], complexity:'advanced', isFull:true},
-      // Engineering
-      {trigger:'rc', display:'RC circuit', insert:'-y + sin(x)', desc:'RC circuit with AC source', cat:'Engineering', tags:['electronics'], complexity:'intermediate', isFull:true},
-      {trigger:'rl', display:'RL circuit', insert:'(1-y)/x', desc:'RL circuit transient', cat:'Engineering', tags:['electronics'], complexity:'intermediate', isFull:true},
-      {trigger:'cooling', display:"Newton's cooling", insert:'-0.3*(y-1)', desc:"Newton's law of cooling", cat:'Engineering', tags:['thermal'], complexity:'basic', isFull:true},
-      {trigger:'mixing', display:'Mixing tank', insert:'(2 - 0.5*y)/10', desc:'Mixing tank problem', cat:'Engineering', complexity:'intermediate', isFull:true},
-      {trigger:'terminal', display:'Terminal velocity', insert:'9.8 - 0.1*y^2', desc:'Drag with v² term', cat:'Engineering', tags:['gravity'], complexity:'intermediate', isFull:true},
-      {trigger:'population', display:'Logistic w/ harvest', insert:'y*(1-y) - 0.2', desc:'Population with harvesting', cat:'Engineering', complexity:'intermediate', isFull:true},
-      {trigger:'lotka', display:'Lotka-Volterra (slice)', insert:'2*y - 0.5*y*x', desc:'Lotka-Volterra (1D)', cat:'Engineering', tags:['ecology'], complexity:'advanced', isFull:true},
-      {trigger:'sir', display:'SIR epidemic (I)', insert:'0.3*(1-y)*y - 0.1*y', desc:'SIR model (I component)', cat:'Engineering', tags:['epidemic'], complexity:'advanced', isFull:true},
-      {trigger:'chemical', display:'Chemical k(a-y)(b-y)', insert:'0.5*(1-y)*(2-y)', desc:'Second-order reaction', cat:'Engineering', complexity:'advanced', isFull:true},
-      // Advanced
-      {trigger:'abel', display:'Abel: y³+f(x)y+g(x)', insert:'y^3 + x*y + sin(x)', desc:'Abel equation 1st kind', cat:'Advanced', complexity:'research', isFull:true},
-      {trigger:'chini', display:'Chini: y³+sin(x)', insert:'y^3 + sin(x)', desc:'Chini equation', cat:'Advanced', complexity:'research', isFull:true},
-      {trigger:'blowup', display:'Blow-up: 1+y²', insert:'1 + y^2', desc:'Finite-time blow-up', cat:'Advanced', tags:['singularity'], complexity:'advanced', isFull:true},
-      {trigger:'singular', display:'Singular: y/x+x', insert:'y/x + x', desc:'Singular at x=0', cat:'Advanced', complexity:'intermediate', isFull:true},
-      {trigger:'stiff', display:'Stiff: -1000(y-sin(x))', insert:'-1000*(y-sin(x))', desc:'Stiff ODE example', cat:'Advanced', tags:['numerical'], complexity:'research', isFull:true},
+      // Functions (only function names — no full equations)
+      {trigger:'sin', insert:'sin()', cursorBack:1},
+      {trigger:'cos', insert:'cos()', cursorBack:1},
+      {trigger:'tan', insert:'tan()', cursorBack:1},
+      {trigger:'asin', insert:'asin()', cursorBack:1},
+      {trigger:'acos', insert:'acos()', cursorBack:1},
+      {trigger:'atan', insert:'atan()', cursorBack:1},
+      {trigger:'sinh', insert:'sinh()', cursorBack:1},
+      {trigger:'cosh', insert:'cosh()', cursorBack:1},
+      {trigger:'tanh', insert:'tanh()', cursorBack:1},
+      {trigger:'exp', insert:'exp()', cursorBack:1},
+      {trigger:'log', insert:'log()', cursorBack:1},
+      {trigger:'ln', insert:'log()', cursorBack:1},
+      {trigger:'sqrt', insert:'sqrt()', cursorBack:1},
+      {trigger:'abs', insert:'abs()', cursorBack:1},
+      {trigger:'pi', insert:'pi', cursorBack:0},
     ];
 
     function acFindMatches(query, limit){
       limit = limit || 6;
-      if(!query){
-        return AC_ENTRIES.filter(e => e.complexity === 'basic' && e.isFull).slice(0, limit);
-      }
+      if(!query) return [];
       const q = query.toLowerCase();
       const scored = [];
       for(const e of AC_ENTRIES){
         let score = 0;
         if(e.trigger.toLowerCase() === q) score = 100;
         else if(e.trigger.toLowerCase().startsWith(q)) score = 80;
-        else if(e.display.toLowerCase().startsWith(q)) score = 60;
-        else if((e.tags||[]).some(t => t.toLowerCase().startsWith(q))) score = 50;
         else if(e.trigger.toLowerCase().indexOf(q) >= 0) score = 40;
-        else if((e.tags||[]).some(t => t.toLowerCase().indexOf(q) >= 0)) score = 30;
-        else if(e.desc.toLowerCase().indexOf(q) >= 0) score = 20;
-        if(score > 0){
-          if(e.complexity === 'basic') score += 5;
-          scored.push({score, entry: e});
-        }
+        if(score > 0) scored.push({score, entry: e});
       }
       scored.sort((a,b) => b.score - a.score);
       return scored.slice(0, limit).map(s => s.entry);
@@ -755,9 +704,7 @@
       acCurrentSuggestions.forEach((entry, i) => {
         const btn = document.createElement('button');
         btn.className = 'ac-item' + (i === acSelectedIndex ? ' selected' : '');
-        // Show plain text: the actual insert text (so users see/learn the real ODE syntax)
-        const plainText = entry.isFull ? entry.insert : entry.trigger;
-        btn.textContent = plainText;
+        btn.textContent = entry.insert;
         btn.addEventListener('mousedown', e => {
           e.preventDefault();
           acSelectEntry(entry);
@@ -769,12 +716,7 @@
     function acUpdate(){
       const token = acGetCurrentToken();
       const text = plain.value;
-      let suggestions;
-      if(token.length >= 2 || text.length === 0){
-        suggestions = acFindMatches(token, 6);
-      } else {
-        suggestions = [];
-      }
+      let suggestions = (token.length >= 2) ? acFindMatches(token, 6) : [];
       acCurrentSuggestions = suggestions;
       acSelectedIndex = 0;
 
@@ -795,25 +737,21 @@
     }
 
     function acSelectEntry(entry){
+      // Function-only autocomplete: replace current token with insert text
       const text = plain.value;
       const cursor = plain.selectionStart || 0;
-      let newText, newCursor;
-      if(entry.isFull){
-        newText = entry.insert;
-        newCursor = newText.length;
-      } else {
-        const token = acGetCurrentToken();
-        const beforeToken = text.substring(0, cursor - token.length);
-        const afterCursor = text.substring(cursor);
-        newText = beforeToken + entry.insert + afterCursor;
-        newCursor = (beforeToken + entry.insert).length - (entry.cursorBack || 0);
-      }
+      const token = acGetCurrentToken();
+      const beforeToken = text.substring(0, cursor - token.length);
+      const afterCursor = text.substring(cursor);
+      const newText = beforeToken + entry.insert + afterCursor;
+      const newCursor = (beforeToken + entry.insert).length - (entry.cursorBack || 0);
       plain.value = newText;
       plain.setSelectionRange(newCursor, newCursor);
       latex = newText;
       rebuildFunction();
       renderKaTeX();
       render();
+      autoGrowTextarea();
       acDropdown.classList.remove('open');
       plain.focus();
     }
@@ -866,38 +804,132 @@
       });
     }
 
-    /* ===== PRESETS ===== */
+    /* ===== TEMPLATES (full ODEs in y'= form) ===== */
     const PRESETS = [
-      { name: "Logistic Growth", eq: "y*(1-y)", cat: "Classic" },
-      { name: "Harmonic", eq: "-y", cat: "Classic" },
-      { name: "Exponential Decay", eq: "-0.5*y", cat: "Classic" },
-      { name: "Bernoulli", eq: "y - y^2", cat: "Classic" },
-      { name: "Separable", eq: "x*y", cat: "Separable" },
-      { name: "Trigonometric", eq: "sin(x)*cos(y)", cat: "Trig" },
-      { name: "Saddle", eq: "x - y", cat: "Linear" },
-      { name: "Spiral Source", eq: "x + y", cat: "Linear" },
-      { name: "Nonlinear", eq: "x^2 - y^2", cat: "Nonlinear" },
-      { name: "Van der Pol (approx)", eq: "y - x^3/3 + x", cat: "Nonlinear" },
-      { name: "Riccati", eq: "x^2 + y^2", cat: "Nonlinear" },
-      { name: "Implicit Example", eq: "y' + tan(x)*y = x*sin(2*x)", cat: "Implicit" },
+      // ----- Polynomials -----
+      { name: "Constant",            eq: "y' = 1",                          cat: "Polynomials" },
+      { name: "Linear in x",         eq: "y' = x",                          cat: "Polynomials" },
+      { name: "Linear in y",         eq: "y' = y",                          cat: "Polynomials" },
+      { name: "Quadratic",           eq: "y' = x^2",                        cat: "Polynomials" },
+      { name: "Cubic",               eq: "y' = x^3",                        cat: "Polynomials" },
+      { name: "x squared minus y squared", eq: "y' = x^2 - y^2",            cat: "Polynomials" },
+      { name: "x times y",           eq: "y' = x*y",                        cat: "Polynomials" },
+      { name: "x plus y",            eq: "y' = x + y",                      cat: "Polynomials" },
+      { name: "x minus y",           eq: "y' = x - y",                      cat: "Polynomials" },
+
+      // ----- Exponential -----
+      { name: "Exponential growth",  eq: "y' = e^x",                        cat: "Exponential" },
+      { name: "Exponential decay",   eq: "y' = e^(-x)",                     cat: "Exponential" },
+      { name: "Gaussian",            eq: "y' = e^(-x^2)",                   cat: "Exponential" },
+      { name: "Decay times sine",    eq: "y' = e^(-x)*sin(x)",              cat: "Exponential" },
+      { name: "Gaussian times sin(y)", eq: "y' = e^(-x^2)*sin(y)",          cat: "Exponential" },
+      { name: "k·y exponential",     eq: "y' = 0.5*y",                      cat: "Exponential" },
+      { name: "Negative k·y decay",  eq: "y' = -0.5*y",                     cat: "Exponential" },
+
+      // ----- Logarithmic / Rational -----
+      { name: "Natural log",         eq: "y' = log(x)",                     cat: "Log / Rational" },
+      { name: "1/x",                 eq: "y' = 1/x",                        cat: "Log / Rational" },
+      { name: "Arctangent derivative", eq: "y' = 1/(1 + x^2)",              cat: "Log / Rational" },
+      { name: "y over x",            eq: "y' = y/x",                        cat: "Log / Rational" },
+      { name: "x over y",            eq: "y' = x/y",                        cat: "Log / Rational" },
+      { name: "Negative x over y (circles)", eq: "y' = -x/y",               cat: "Log / Rational" },
+
+      // ----- Trigonometric -----
+      { name: "sin x",               eq: "y' = sin(x)",                     cat: "Trigonometric" },
+      { name: "cos x",               eq: "y' = cos(x)",                     cat: "Trigonometric" },
+      { name: "sin y",               eq: "y' = sin(y)",                     cat: "Trigonometric" },
+      { name: "cos y",               eq: "y' = cos(y)",                     cat: "Trigonometric" },
+      { name: "sin(x)·cos(y)",       eq: "y' = sin(x)*cos(y)",              cat: "Trigonometric" },
+      { name: "sin(x) + cos(y)",     eq: "y' = sin(x) + cos(y)",            cat: "Trigonometric" },
+      { name: "tan(x)·y",            eq: "y' = tan(x)*y",                   cat: "Trigonometric" },
+      { name: "sin(x²)",             eq: "y' = sin(x^2)",                   cat: "Trigonometric" },
+      { name: "Negative y (oscillator)", eq: "y' = -y",                     cat: "Trigonometric" },
+
+      // ----- Roots -----
+      { name: "Square root of x",    eq: "y' = sqrt(x)",                    cat: "Roots" },
+      { name: "Square root of y",    eq: "y' = sqrt(y)",                    cat: "Roots" },
+      { name: "sqrt(1 + y²)",        eq: "y' = sqrt(1 + y^2)",              cat: "Roots" },
+      { name: "sqrt(x² + y²)",       eq: "y' = sqrt(x^2 + y^2)",            cat: "Roots" },
+
+      // ----- Classic 1st-Order ODEs -----
+      { name: "Logistic growth",     eq: "y' = y*(1-y)",                    cat: "Classic ODEs" },
+      { name: "Logistic with carrying capacity", eq: "y' = 0.5*y*(1-y/4)",  cat: "Classic ODEs" },
+      { name: "Bernoulli",           eq: "y' = y - y^2",                    cat: "Classic ODEs" },
+      { name: "Riccati",             eq: "y' = x^2 + y^2",                  cat: "Classic ODEs" },
+      { name: "Homogeneous (y/x)",   eq: "y' = y/x + 1",                    cat: "Classic ODEs" },
+      { name: "Exact form example",  eq: "y' = -(2*x*y + 3) / (x^2 - 1)",   cat: "Classic ODEs" },
+
+      // ----- Phase Plane / Equilibria -----
+      { name: "Saddle point",        eq: "y' = x - y",                      cat: "Phase Plane" },
+      { name: "Spiral source",       eq: "y' = x + y",                      cat: "Phase Plane" },
+      { name: "Stable node",         eq: "y' = -2*y + x",                   cat: "Phase Plane" },
+      { name: "Center",              eq: "y' = -x/y",                       cat: "Phase Plane" },
+      { name: "Pitchfork bifurcation", eq: "y' = y^3 - y",                  cat: "Phase Plane" },
+      { name: "Transcritical bifurcation", eq: "y' = y*(1 - y/x)",          cat: "Phase Plane" },
+
+      // ----- Nonlinear / Chaos-Adjacent -----
+      { name: "Van der Pol (1D slice)", eq: "y' = y - x^3/3 + x",           cat: "Nonlinear" },
+      { name: "Duffing (driven)",    eq: "y' = y - y^3 + cos(x)",           cat: "Nonlinear" },
+      { name: "Limit cycle",         eq: "y' = y - x*(x^2 + y^2 - 1)",      cat: "Nonlinear" },
+      { name: "Mathieu-type",        eq: "y' = -(1 + cos(x))*y",            cat: "Nonlinear" },
+      { name: "Abel equation",       eq: "y' = y^3 + x*y + sin(x)",         cat: "Nonlinear" },
+      { name: "Blow-up",             eq: "y' = 1 + y^2",                    cat: "Nonlinear" },
+
+      // ----- Implicit / Higher Forms -----
+      { name: "Implicit linear",     eq: "y' + tan(x)*y = x*sin(2*x)",      cat: "Implicit" },
+      { name: "Clairaut's equation", eq: "x*y' - y + (y')^2 = 0",           cat: "Implicit" },
+      { name: "Sum equals product",  eq: "y' + y = x*y",                    cat: "Implicit" },
+      { name: "Linear with cosine",  eq: "y' + 2*y = cos(x)",               cat: "Implicit" },
+      { name: "Linear with x",       eq: "y' - y/x = x^2",                  cat: "Implicit" },
+
+      // ----- Engineering / Applied -----
+      { name: "Newton's cooling",    eq: "y' = -0.3*(y - 1)",               cat: "Engineering" },
+      { name: "RC circuit (AC)",     eq: "y' = -y + sin(x)",                cat: "Engineering" },
+      { name: "RL circuit",          eq: "y' = (10 - 3*y)/0.5",             cat: "Engineering" },
+      { name: "Mixing tank",         eq: "y' = (2 - 0.5*y)/10",             cat: "Engineering" },
+      { name: "Terminal velocity",   eq: "y' = 9.8 - 0.1*y^2",              cat: "Engineering" },
+      { name: "Logistic w/ harvest", eq: "y' = y*(1-y) - 0.2",              cat: "Engineering" },
+      { name: "Lotka-Volterra (slice)", eq: "y' = 2*y - 0.5*y*x",           cat: "Engineering" },
+      { name: "SIR epidemic (I)",    eq: "y' = 0.3*(1 - y)*y - 0.1*y",      cat: "Engineering" },
+      { name: "Chemical kinetics",   eq: "y' = 0.5*(1 - y)*(2 - y)",        cat: "Engineering" },
+
+      // ----- Singular / Stiff -----
+      { name: "Singular at x=0",     eq: "y' = y/x + x",                    cat: "Singular / Stiff" },
+      { name: "Stiff ODE",           eq: "y' = -1000*(y - sin(x))",         cat: "Singular / Stiff" },
     ];
 
     function buildPresets(){
       presetsDropdown.innerHTML = '';
+      // Group by category
+      const groups = {};
+      const order = [];
       PRESETS.forEach(p => {
-        const btn = document.createElement('button');
-        btn.className = 'preset-item';
-        btn.innerHTML = '<div><div class="preset-name">'+p.name+'</div><div class="preset-eq">'+p.eq+'</div></div><span class="preset-cat">'+p.cat+'</span>';
-        btn.addEventListener('click', () => {
-          latex = p.eq;
-          plain.value = p.eq;
-          if(!usingPlain && mqField) mqField.latex(p.eq);
-          rebuildFunction();
-          renderKaTeX();
-          render();
-          presetsDropdown.classList.remove('open');
+        if(!groups[p.cat]){ groups[p.cat] = []; order.push(p.cat); }
+        groups[p.cat].push(p);
+      });
+      order.forEach(catName => {
+        // Category header
+        const header = document.createElement('div');
+        header.className = 'preset-cat-header';
+        header.textContent = catName;
+        presetsDropdown.appendChild(header);
+        // Items in category
+        groups[catName].forEach(p => {
+          const btn = document.createElement('button');
+          btn.className = 'preset-item';
+          btn.innerHTML = '<div class="preset-name">'+p.name+'</div><div class="preset-eq">'+p.eq+'</div>';
+          btn.addEventListener('click', () => {
+            latex = p.eq;
+            plain.value = p.eq;
+            if(!usingPlain && mqField) mqField.latex(p.eq);
+            rebuildFunction();
+            renderKaTeX();
+            render();
+            autoGrowTextarea();
+            presetsDropdown.classList.remove('open');
+          });
+          presetsDropdown.appendChild(btn);
         });
-        presetsDropdown.appendChild(btn);
       });
     }
     buildPresets();
@@ -963,35 +995,75 @@
 
     /* ===== COMPILERS ===== */
     function addImplicitMultiplication(s){
-      // Insert * between number and variable/letter:  2x -> 2*x, 3y -> 3*y, 0.5y -> 0.5*y
-      // And between variable/closing paren and opening paren: x(  -> x*(  but only if x is var
-      // Be careful not to break function calls like sin(x), cos(x), tan(x), exp(x), log(x), sqrt(x)
-      // Simple safe pass: number followed by letter (not e in 1e5 scientific notation)
-      // Match: digit followed by letter that is x, y, p (pi), s (sin), c (cos), t (tan), l (log/ln), sq (sqrt), e (exp)
-      // Easier: match digit followed by any letter, but skip if it's part of scientific notation (1e5, 2e-3)
-      s = s.replace(/(\d)([a-zA-Z])/g, function(_, d, l) {
-        // Skip scientific notation: digit followed by 'e' followed by digit/sign
-        if (l === 'e' || l === 'E') {
-          // Could be scientific notation, leave alone — user likely wants the constant e or eulers
-          // But also could be `2exp(x)` which should be `2*exp(x)`
-          // Safest: only treat as scientific if followed by digit/sign
-          // We can't see ahead from inside replace easily. Just leave 'e' cases alone for safety.
-          return d + l;
-        }
+      // Insert * between digit and letter: 2x -> 2*x. Skip 'e' to preserve scientific notation.
+      return s.replace(/(\d)([a-zA-Z])/g, function(_, d, l) {
+        if (l === 'e' || l === 'E') return d + l;
         return d + '*' + l;
       });
-      // Also handle: variable followed by parenthesis only if it's NOT a known function
-      // e.g. y(x+1) is meaningless but x(2*x) is invalid — both should NOT be auto-fixed
-      // Skip this for safety
+    }
+
+    /**
+     * Replace x^y with Math.pow(x,y) using brace counting to handle nested expressions
+     * and avoid the JS `**` precedence trap with unary minus (e^(-x^2)).
+     */
+    function caretToPow(s) {
+      // Iteratively find each ^ and wrap base/exponent
+      // Strategy: scan for ^, then find the operand to the left and to the right
+      let i = 0;
+      while ((i = s.indexOf('^', i)) !== -1) {
+        // Find left operand
+        let lEnd = i;
+        let lStart = lEnd;
+        if (s[lEnd - 1] === ')') {
+          // Match parenthesis backwards
+          let depth = 1;
+          lStart = lEnd - 2;
+          while (lStart >= 0 && depth > 0) {
+            if (s[lStart] === ')') depth++;
+            else if (s[lStart] === '(') depth--;
+            if (depth > 0) lStart--;
+          }
+        } else {
+          // Identifier or number (possibly with decimal point)
+          lStart = lEnd - 1;
+          while (lStart >= 0 && /[a-zA-Z0-9_.]/.test(s[lStart])) lStart--;
+          lStart++;
+        }
+        const left = s.substring(lStart, lEnd);
+
+        // Find right operand
+        let rStart = i + 1;
+        let rEnd = rStart;
+        // Allow leading unary minus or plus
+        if (s[rStart] === '-' || s[rStart] === '+') rEnd = rStart + 1;
+        if (s[rEnd] === '(') {
+          // Match parenthesis forwards
+          let depth = 1;
+          rEnd++;
+          while (rEnd < s.length && depth > 0) {
+            if (s[rEnd] === '(') depth++;
+            else if (s[rEnd] === ')') depth--;
+            rEnd++;
+          }
+        } else {
+          while (rEnd < s.length && /[a-zA-Z0-9_.]/.test(s[rEnd])) rEnd++;
+        }
+        const right = s.substring(i + 1, rEnd);
+
+        const replacement = 'Math.pow(' + left + ',' + right + ')';
+        s = s.substring(0, lStart) + replacement + s.substring(rEnd);
+        // Move past the replacement
+        i = lStart + replacement.length;
+      }
       return s;
     }
 
     function compileExplicit(expr){
       let processed = addImplicitMultiplication(String(expr));
-      const js = processed.replace(/\^/g,'**');
-      const raw = new Function('x','y','sin','cos','tan','exp','log','sqrt','pi','e',
+      const js = caretToPow(processed);
+      const raw = new Function('x','y','sin','cos','tan','exp','log','sqrt','pi','e','Math',
         '"use strict"; const v=('+js+'); return Number.isFinite(v)?v:NaN;');
-      const f = (x,y) => raw(x,y,Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt,Math.PI,Math.E);
+      const f = (x,y) => raw(x,y,Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt,Math.PI,Math.E,Math);
       void f(0,0); return f;
     }
     function compileImplicit(exprRaw){
@@ -1000,10 +1072,10 @@
       s = s.replace(/dy\/dx/g,'m').replace(/y'/g,'m');
       s = addImplicitMultiplication(s);
       if(s.includes('=')){ const parts = s.split('='); s = '('+parts[0]+')-('+parts.slice(1).join('=')+')'; }
-      s = s.replace(/\^/g,'**');
-      const rawF = new Function('x','y','m','sin','cos','tan','exp','log','sqrt','pi','e',
+      s = caretToPow(s);
+      const rawF = new Function('x','y','m','sin','cos','tan','exp','log','sqrt','pi','e','Math',
         '"use strict"; const v=('+s+'); return Number.isFinite(v)?v:NaN;');
-      const F = (x,y,m) => rawF(x,y,m,Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt,Math.PI,Math.E);
+      const F = (x,y,m) => rawF(x,y,m,Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt,Math.PI,Math.E,Math);
       const EPS=1e-6;
       function slope(x,y){
         const F0=F(x,y,0); if(!Number.isFinite(F0)) return NaN;
