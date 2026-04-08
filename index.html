@@ -276,7 +276,7 @@
       background: var(--glass); color: var(--muted); white-space: nowrap;
     }
 
-    /* ===== AUTOCOMPLETE DROPDOWN ===== */
+    /* ===== AUTOCOMPLETE DROPDOWN (plain text style) ===== */
     .ac-wrap {
       position: relative;
       flex: 1; min-width: 180px;
@@ -285,64 +285,27 @@
       display: none;
       position: absolute;
       top: calc(100% + 6px); left: 0; right: 0; z-index: 200;
-      max-height: 320px; overflow-y: auto;
+      max-height: 280px; overflow-y: auto;
       background: var(--panel-solid);
-      border: 1.5px solid var(--accent);
-      border-radius: 12px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
-      animation: fadeIn 0.12s ease-out;
+      border: 1px solid var(--control-border);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      animation: fadeIn 0.1s ease-out;
     }
     .ac-dropdown.open { display: block; }
-    .ac-cats {
-      display: flex; gap: 5px; padding: 8px;
-      overflow-x: auto;
-      border-bottom: 1px solid var(--control-border);
-      flex-shrink: 0;
-    }
-    .ac-cat {
-      flex-shrink: 0;
-      font-size: 10px; font-weight: 600;
-      padding: 4px 10px;
-      border: 1px solid var(--control-border);
-      border-radius: 12px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.15s;
-    }
-    .ac-cat:hover { border-color: var(--accent); }
-    .ac-cat.active {
-      background: rgba(245,158,11,0.15);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
     .ac-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 14px;
+      display: block;
+      padding: 6px 12px;
       border: none; background: none; width: 100%; text-align: left;
       color: var(--ink); font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
       cursor: pointer;
-      border-left: 3px solid transparent;
-      transition: background 0.1s;
     }
     .ac-item:hover, .ac-item.selected {
       background: rgba(245,158,11,0.12);
-      border-left-color: var(--accent);
-    }
-    .ac-item-name {
-      font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px;
-      margin-bottom: 2px; color: var(--ink);
-    }
-    .ac-item-desc { font-size: 11px; color: var(--muted); }
-    .ac-item-badge {
-      font-size: 9px; font-weight: 600;
-      padding: 2px 6px; border-radius: 4px;
-      background: var(--glass); color: var(--muted);
-      margin-left: 8px; white-space: nowrap;
     }
     .ac-hint {
-      padding: 6px 14px;
+      padding: 6px 12px;
       font-size: 11px; font-style: italic;
       color: var(--accent);
       border-top: 1px solid var(--control-border);
@@ -499,7 +462,6 @@
         <div class="ac-wrap">
           <input id="plain" class="plain" placeholder="Type any ODE: y' + tan(x)*y = x*sin(2*x), or sin(x)*cos(y)" spellcheck="false" autocomplete="off" />
           <div class="ac-dropdown" id="acDropdown">
-            <div class="ac-cats" id="acCats"></div>
             <div id="acItems"></div>
             <div class="ac-hint" id="acHint" style="display:none"></div>
           </div>
@@ -771,14 +733,10 @@
 
     /* ===== AUTOCOMPLETE UI ===== */
     const acDropdown = document.getElementById('acDropdown');
-    const acCats = document.getElementById('acCats');
     const acItems = document.getElementById('acItems');
     const acHint = document.getElementById('acHint');
     let acSelectedIndex = 0;
-    let acFilterCategory = 'All';
     let acCurrentSuggestions = [];
-
-    const AC_CATEGORIES = ['All', 'Functions', 'Classic ODEs', 'Trig / Oscillatory', 'Nonlinear', 'Implicit', 'Engineering', 'Advanced'];
 
     function acGetCurrentToken(){
       const text = plain.value;
@@ -788,34 +746,14 @@
       return m ? m[0] : '';
     }
 
-    function acRenderCats(){
-      acCats.innerHTML = '';
-      AC_CATEGORIES.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.className = 'ac-cat' + (cat === acFilterCategory ? ' active' : '');
-        btn.textContent = cat;
-        btn.addEventListener('click', e => {
-          e.preventDefault();
-          e.stopPropagation();
-          acFilterCategory = cat;
-          acUpdate();
-        });
-        acCats.appendChild(btn);
-      });
-    }
-
     function acRenderItems(){
       acItems.innerHTML = '';
       acCurrentSuggestions.forEach((entry, i) => {
         const btn = document.createElement('button');
         btn.className = 'ac-item' + (i === acSelectedIndex ? ' selected' : '');
-        btn.innerHTML = `
-          <div style="flex:1;min-width:0;">
-            <div class="ac-item-name">${entry.display}</div>
-            <div class="ac-item-desc">${entry.desc}</div>
-          </div>
-          <span class="ac-item-badge">${entry.complexity}</span>
-        `;
+        // Show plain text: the actual insert text (so users see/learn the real ODE syntax)
+        const plainText = entry.isFull ? entry.insert : entry.trigger;
+        btn.textContent = plainText;
         btn.addEventListener('mousedown', e => {
           e.preventDefault();
           acSelectEntry(entry);
@@ -830,9 +768,6 @@
       let suggestions;
       if(token.length >= 2 || text.length === 0){
         suggestions = acFindMatches(token, 6);
-        if(acFilterCategory !== 'All'){
-          suggestions = suggestions.filter(e => e.cat === acFilterCategory);
-        }
       } else {
         suggestions = [];
       }
@@ -848,7 +783,6 @@
       }
 
       if(suggestions.length > 0 || hint){
-        acRenderCats();
         acRenderItems();
         acDropdown.classList.add('open');
       } else {
