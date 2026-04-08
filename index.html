@@ -286,6 +286,15 @@
       font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);
       margin-top: 1px;
     }
+    .preset-eq-katex {
+      margin-top: 3px;
+      font-size: 13px;
+      color: var(--ink);
+      opacity: 0.85;
+    }
+    .preset-eq-fallback {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);
+    }
 
     /* ===== AUTOCOMPLETE DROPDOWN (plain text style) ===== */
     .ac-wrap {
@@ -762,18 +771,61 @@
       plain.style.height = (plain.scrollHeight) + 'px';
     }
 
+    /* ===== Inline templates menu state ===== */
+    let inlineMenuVisible = false;
+
+    function isCurrentEquationValid(){
+      return !parseError && plain.value.trim().length > 0;
+    }
+
+    function updateInputStateUI(){
+      // Show templates menu if input is focused AND (empty OR currently invalid)
+      // Hide and show rendered KaTeX if equation is valid
+      if (inlineMenuVisible) {
+        presetsDropdown.classList.add('open');
+        eqRendered.style.display = 'none';
+      } else {
+        presetsDropdown.classList.remove('open');
+        eqRendered.style.display = '';
+      }
+    }
+
+    function openInlineMenu(filter){
+      buildPresets(filter);
+      inlineMenuVisible = true;
+      updateInputStateUI();
+    }
+
+    function closeInlineMenu(){
+      inlineMenuVisible = false;
+      updateInputStateUI();
+    }
+
     function initAutocomplete(){
       // Auto-grow on input
       plain.addEventListener('input', autoGrowTextarea);
       // Initial size
       autoGrowTextarea();
       plain.addEventListener('input', acUpdate);
+      // Templates menu opens on focus
       plain.addEventListener('focus', () => {
+        openInlineMenu(plain.value);
         if(plain.value.length === 0) acUpdate();
+      });
+      // Filter the menu live as user types, and re-evaluate visibility
+      plain.addEventListener('input', () => {
+        if (inlineMenuVisible) buildPresets(plain.value);
+        // If equation is now valid AND non-empty, hide the menu so user sees the field
+        if (isCurrentEquationValid() && plain.value.length > 3) {
+          closeInlineMenu();
+        }
       });
       plain.addEventListener('blur', () => {
         // Delay so click on item still registers
-        setTimeout(() => acDropdown.classList.remove('open'), 200);
+        setTimeout(() => {
+          acDropdown.classList.remove('open');
+          closeInlineMenu();
+        }, 200);
       });
       plain.addEventListener('keydown', e => {
         // Block Enter in textarea (we want it to select autocomplete or do nothing)
@@ -805,6 +857,34 @@
     }
 
     /* ===== TEMPLATES (full ODEs in y'= form) ===== */
+    // Convert a plain ODE string to LaTeX. Handles common patterns.
+    function odeToLatex(eq) {
+      let s = eq;
+      // Functions
+      s = s.replace(/\bsin\b/g, '\\sin');
+      s = s.replace(/\bcos\b/g, '\\cos');
+      s = s.replace(/\btan\b/g, '\\tan');
+      s = s.replace(/\bsinh\b/g, '\\sinh');
+      s = s.replace(/\bcosh\b/g, '\\cosh');
+      s = s.replace(/\btanh\b/g, '\\tanh');
+      s = s.replace(/\basin\b/g, '\\arcsin');
+      s = s.replace(/\bacos\b/g, '\\arccos');
+      s = s.replace(/\batan\b/g, '\\arctan');
+      s = s.replace(/\bln\b/g, '\\ln');
+      s = s.replace(/\blog\b/g, '\\ln');
+      s = s.replace(/\bexp\(([^)]+)\)/g, 'e^{$1}');
+      s = s.replace(/\bsqrt\(([^)]+)\)/g, '\\sqrt{$1}');
+      s = s.replace(/\babs\(([^)]+)\)/g, '\\left|$1\\right|');
+      // Constants
+      s = s.replace(/\bpi\b/g, '\\pi');
+      // Multiplication: keep * for clarity but use \cdot, drop * adjacent to letters/parens
+      s = s.replace(/\*/g, ' \\cdot ');
+      // Powers: x^2 -> x^{2}, x^(2) -> x^{2}
+      s = s.replace(/\^([a-zA-Z0-9.]+)/g, '^{$1}');
+      s = s.replace(/\^\(([^)]+)\)/g, '^{$1}');
+      return s;
+    }
+
     const PRESETS = [
       // ----- Polynomials -----
       { name: "Constant",            eq: "y' = 1",                          cat: "Polynomials" },
@@ -898,27 +978,59 @@
       { name: "Stiff ODE",           eq: "y' = -1000*(y - sin(x))",         cat: "Singular / Stiff" },
     ];
 
-    function buildPresets(){
+    function buildPresets(filter){
       presetsDropdown.innerHTML = '';
+      const filterText = (filter || '').toLowerCase().trim();
       // Group by category
       const groups = {};
       const order = [];
       PRESETS.forEach(p => {
+        // Filter
+        if (filterText) {
+          const haystack = (p.name + ' ' + p.eq + ' ' + p.cat).toLowerCase();
+          if (!haystack.includes(filterText)) return;
+        }
         if(!groups[p.cat]){ groups[p.cat] = []; order.push(p.cat); }
         groups[p.cat].push(p);
       });
+      if (order.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'padding: 16px; text-align: center; color: var(--muted); font-size: 13px;';
+        empty.textContent = 'No matching templates';
+        presetsDropdown.appendChild(empty);
+        return;
+      }
       order.forEach(catName => {
         // Category header
         const header = document.createElement('div');
         header.className = 'preset-cat-header';
         header.textContent = catName;
         presetsDropdown.appendChild(header);
-        // Items in category
+        // Items in category — each rendered with KaTeX
         groups[catName].forEach(p => {
           const btn = document.createElement('button');
           btn.className = 'preset-item';
-          btn.innerHTML = '<div class="preset-name">'+p.name+'</div><div class="preset-eq">'+p.eq+'</div>';
-          btn.addEventListener('click', () => {
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'preset-name';
+          nameDiv.textContent = p.name;
+          const eqDiv = document.createElement('div');
+          eqDiv.className = 'preset-eq-katex';
+          // Try KaTeX render
+          if (window.katex) {
+            try {
+              katex.render(odeToLatex(p.eq), eqDiv, { throwOnError: false, displayMode: false });
+            } catch (e) {
+              eqDiv.textContent = p.eq;
+              eqDiv.classList.add('preset-eq-fallback');
+            }
+          } else {
+            eqDiv.textContent = p.eq;
+            eqDiv.classList.add('preset-eq-fallback');
+          }
+          btn.appendChild(nameDiv);
+          btn.appendChild(eqDiv);
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // Don't blur input
             latex = p.eq;
             plain.value = p.eq;
             if(!usingPlain && mqField) mqField.latex(p.eq);
@@ -926,7 +1038,10 @@
             renderKaTeX();
             render();
             autoGrowTextarea();
+            // Close menu after selection
             presetsDropdown.classList.remove('open');
+            inlineMenuVisible = false;
+            updateInputStateUI();
           });
           presetsDropdown.appendChild(btn);
         });
