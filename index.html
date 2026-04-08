@@ -147,10 +147,14 @@
     }
     .eq-label { font-size: 14px; font-weight: 600; color: var(--accent); white-space: nowrap; }
     .plain {
-      flex: 1; min-width: 180px; border: none; outline: none;
+      flex: 1; min-width: 180px; width: 100%; border: none; outline: none;
       font-size: 16px; font-family: 'JetBrains Mono', 'Fira Code', monospace;
       background: transparent; color: var(--ink);
+      resize: none; overflow: hidden; line-height: 1.4;
+      padding: 4px 0;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
     }
+    textarea.plain { display: block; min-height: 24px; }
     .mq-editable-field, .mq-math-mode { min-height: 32px; }
 
     /* KaTeX rendered display */
@@ -460,7 +464,7 @@
       <div class="eq-input-wrap">
         <span id="mq" style="display:none"></span>
         <div class="ac-wrap">
-          <input id="plain" class="plain" placeholder="Type any ODE: y' + tan(x)*y = x*sin(2*x), or sin(x)*cos(y)" spellcheck="false" autocomplete="off" />
+          <textarea id="plain" class="plain" placeholder="Type any ODE: y' + tan(x)*y = x*sin(2*x), or sin(x)*cos(y)" spellcheck="false" autocomplete="off" rows="1"></textarea>
           <div class="ac-dropdown" id="acDropdown">
             <div id="acItems"></div>
             <div class="ac-hint" id="acHint" style="display:none"></div>
@@ -814,7 +818,17 @@
       plain.focus();
     }
 
+    function autoGrowTextarea(){
+      // Auto-grow the textarea to fit its content
+      plain.style.height = 'auto';
+      plain.style.height = (plain.scrollHeight) + 'px';
+    }
+
     function initAutocomplete(){
+      // Auto-grow on input
+      plain.addEventListener('input', autoGrowTextarea);
+      // Initial size
+      autoGrowTextarea();
       plain.addEventListener('input', acUpdate);
       plain.addEventListener('focus', () => {
         if(plain.value.length === 0) acUpdate();
@@ -824,6 +838,10 @@
         setTimeout(() => acDropdown.classList.remove('open'), 200);
       });
       plain.addEventListener('keydown', e => {
+        // Block Enter in textarea (we want it to select autocomplete or do nothing)
+        if(e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+        }
         if(!acDropdown.classList.contains('open')) return;
         if(e.key === 'ArrowDown'){
           e.preventDefault();
@@ -944,8 +962,33 @@
     const isImplicitString = s => /=/.test(s) || /y'/.test(s) || /dy\/dx/.test(s);
 
     /* ===== COMPILERS ===== */
+    function addImplicitMultiplication(s){
+      // Insert * between number and variable/letter:  2x -> 2*x, 3y -> 3*y, 0.5y -> 0.5*y
+      // And between variable/closing paren and opening paren: x(  -> x*(  but only if x is var
+      // Be careful not to break function calls like sin(x), cos(x), tan(x), exp(x), log(x), sqrt(x)
+      // Simple safe pass: number followed by letter (not e in 1e5 scientific notation)
+      // Match: digit followed by letter that is x, y, p (pi), s (sin), c (cos), t (tan), l (log/ln), sq (sqrt), e (exp)
+      // Easier: match digit followed by any letter, but skip if it's part of scientific notation (1e5, 2e-3)
+      s = s.replace(/(\d)([a-zA-Z])/g, function(_, d, l) {
+        // Skip scientific notation: digit followed by 'e' followed by digit/sign
+        if (l === 'e' || l === 'E') {
+          // Could be scientific notation, leave alone — user likely wants the constant e or eulers
+          // But also could be `2exp(x)` which should be `2*exp(x)`
+          // Safest: only treat as scientific if followed by digit/sign
+          // We can't see ahead from inside replace easily. Just leave 'e' cases alone for safety.
+          return d + l;
+        }
+        return d + '*' + l;
+      });
+      // Also handle: variable followed by parenthesis only if it's NOT a known function
+      // e.g. y(x+1) is meaningless but x(2*x) is invalid — both should NOT be auto-fixed
+      // Skip this for safety
+      return s;
+    }
+
     function compileExplicit(expr){
-      const js = String(expr).replace(/\^/g,'**');
+      let processed = addImplicitMultiplication(String(expr));
+      const js = processed.replace(/\^/g,'**');
       const raw = new Function('x','y','sin','cos','tan','exp','log','sqrt','pi','e',
         '"use strict"; const v=('+js+'); return Number.isFinite(v)?v:NaN;');
       const f = (x,y) => raw(x,y,Math.sin,Math.cos,Math.tan,Math.exp,Math.log,Math.sqrt,Math.PI,Math.E);
@@ -955,6 +998,7 @@
       let s = String(exprRaw).replace(/\s+/g,'');
       s = s.replace(/\by\s*\(\s*x\s*\)/gi,'y').replace(/\by\s*\(\s*\)/gi,'y').replace(/\bx\s*\(\s*\)/gi,'x');
       s = s.replace(/dy\/dx/g,'m').replace(/y'/g,'m');
+      s = addImplicitMultiplication(s);
       if(s.includes('=')){ const parts = s.split('='); s = '('+parts[0]+')-('+parts.slice(1).join('=')+')'; }
       s = s.replace(/\^/g,'**');
       const rawF = new Function('x','y','m','sin','cos','tan','exp','log','sqrt','pi','e',
