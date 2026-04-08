@@ -1874,6 +1874,14 @@
       introBlink('#themeToggle', 2);
       await introDelay(1500);
 
+      // Phase 7.5: Show the templates menu briefly so users see it exists
+      if(introAbort){ introCleanup(); return; }
+      introBlink('#presetsBtn', 2);
+      openInlineMenu('');
+      await introDelay(2000);
+      closeInlineMenu();
+      await introDelay(300);
+
       // Phase 8: Demo switching equations via presets
       if(introAbort){ introCleanup(); return; }
       introClearArrows();
@@ -2016,8 +2024,10 @@
       introClearArrows();
       introHideCursor();
       introHideLabel();
-      // Highlight replay button with same purple blink as all other elements
+      // Highlight replay button + Presets button with the same purple blink
+      // so users know to click Presets and see the templates menu
       introBlink('#replayIntro', 4);
+      introBlink('#presetsBtn', 5);
     }
 
     // Replay button
