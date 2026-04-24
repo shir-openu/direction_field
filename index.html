@@ -1929,8 +1929,8 @@
 
       // Cycle through 3 preset equations
       var demoPres = [
-        { eq: "y*(1-y)", name: "Logistic Growth" },
-        { eq: "x^2 - y^2", name: "Nonlinear" }
+        { eq: "sin(y') = x",           name: "sin of y' equals x" },
+        { eq: "x*y' - y + (y')^2 = 0", name: "Clairaut's equation" }
       ];
 
       for(var pi = 0; pi < demoPres.length; pi++){
@@ -1968,12 +1968,12 @@
       var eqRect = document.querySelector('.eq-input-wrap').getBoundingClientRect();
       var badgesRect = document.querySelector('.badges').getBoundingClientRect();
       introShowLabel('type your own', badgesRect.left, eqRect.top - 28);
-      await introTypeEquation('y^2 - x', 60);
+      await introTypeEquation("(y')^2 - 2*y' + y = 0", 60);
       await introDelay(1200);
 
       // Type another one
       if(introAbort){ introCleanup(); return; }
-      await introTypeEquation('exp(-x^2)*sin(y)', 50);
+      await introTypeEquation('y*(1-y)', 50);
       await introDelay(1200);
 
       // Restore original
