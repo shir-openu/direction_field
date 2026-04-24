@@ -263,15 +263,25 @@
       animation: fadeIn 0.15s ease-out;
     }
     .presets-dropdown.open { display: block; }
+    .preset-group-header {
+      font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;
+      color: var(--ink);
+      padding: 14px 14px 8px;
+      margin-top: 6px;
+      border-top: 2px solid var(--accent);
+      background: rgba(245, 158, 11, 0.12);
+    }
+    .preset-group-header:first-child { border-top: none; margin-top: 0; }
     .preset-cat-header {
       font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
       color: var(--accent);
-      padding: 10px 14px 4px;
-      margin-top: 4px;
+      padding: 10px 14px 4px 22px;
+      margin-top: 2px;
       border-top: 1px solid var(--control-border);
       background: rgba(245, 158, 11, 0.04);
     }
-    .preset-cat-header:first-child { border-top: none; margin-top: 0; }
+    .preset-cat-header.first-in-group { border-top: none; margin-top: 0; }
+    .preset-item.in-group { padding-left: 22px; }
     .preset-item {
       display: block;
       padding: 6px 14px;
@@ -885,131 +895,150 @@
       return s;
     }
 
+    // Two-tier structure: each preset has a `group` (top-level heading) and a `cat` (subcategory).
     const PRESETS = [
+      // ========== GROUP: EXPLICIT FORM ==========
       // ----- Polynomials -----
-      { name: "Constant",            eq: "y' = 1",                          cat: "Polynomials" },
-      { name: "Linear in x",         eq: "y' = x",                          cat: "Polynomials" },
-      { name: "Linear in y",         eq: "y' = y",                          cat: "Polynomials" },
-      { name: "Quadratic",           eq: "y' = x^2",                        cat: "Polynomials" },
-      { name: "Cubic",               eq: "y' = x^3",                        cat: "Polynomials" },
-      { name: "x squared minus y squared", eq: "y' = x^2 - y^2",            cat: "Polynomials" },
-      { name: "x times y",           eq: "y' = x*y",                        cat: "Polynomials" },
-      { name: "x plus y",            eq: "y' = x + y",                      cat: "Polynomials" },
-      { name: "x minus y",           eq: "y' = x - y",                      cat: "Polynomials" },
+      { name: "Constant",            eq: "y' = 1",                          cat: "Polynomials",        group: "Explicit Form" },
+      { name: "Linear in x",         eq: "y' = x",                          cat: "Polynomials",        group: "Explicit Form" },
+      { name: "Linear in y",         eq: "y' = y",                          cat: "Polynomials",        group: "Explicit Form" },
+      { name: "Quadratic",           eq: "y' = x^2",                        cat: "Polynomials",        group: "Explicit Form" },
+      { name: "Cubic",               eq: "y' = x^3",                        cat: "Polynomials",        group: "Explicit Form" },
+      { name: "x squared minus y squared", eq: "y' = x^2 - y^2",            cat: "Polynomials",        group: "Explicit Form" },
+      { name: "x times y",           eq: "y' = x*y",                        cat: "Polynomials",        group: "Explicit Form" },
+      { name: "x plus y",            eq: "y' = x + y",                      cat: "Polynomials",        group: "Explicit Form" },
+      { name: "x minus y",           eq: "y' = x - y",                      cat: "Polynomials",        group: "Explicit Form" },
 
       // ----- Exponential -----
-      { name: "Exponential growth",  eq: "y' = e^x",                        cat: "Exponential" },
-      { name: "Exponential decay",   eq: "y' = e^(-x)",                     cat: "Exponential" },
-      { name: "Gaussian",            eq: "y' = e^(-x^2)",                   cat: "Exponential" },
-      { name: "Decay times sine",    eq: "y' = e^(-x)*sin(x)",              cat: "Exponential" },
-      { name: "Gaussian times sin(y)", eq: "y' = e^(-x^2)*sin(y)",          cat: "Exponential" },
-      { name: "k·y exponential",     eq: "y' = 0.5*y",                      cat: "Exponential" },
-      { name: "Negative k·y decay",  eq: "y' = -0.5*y",                     cat: "Exponential" },
+      { name: "Exponential growth",  eq: "y' = e^x",                        cat: "Exponential",        group: "Explicit Form" },
+      { name: "Exponential decay",   eq: "y' = e^(-x)",                     cat: "Exponential",        group: "Explicit Form" },
+      { name: "Gaussian",            eq: "y' = e^(-x^2)",                   cat: "Exponential",        group: "Explicit Form" },
+      { name: "Decay times sine",    eq: "y' = e^(-x)*sin(x)",              cat: "Exponential",        group: "Explicit Form" },
+      { name: "Gaussian times sin(y)", eq: "y' = e^(-x^2)*sin(y)",          cat: "Exponential",        group: "Explicit Form" },
+      { name: "k·y exponential",     eq: "y' = 0.5*y",                      cat: "Exponential",        group: "Explicit Form" },
+      { name: "Negative k·y decay",  eq: "y' = -0.5*y",                     cat: "Exponential",        group: "Explicit Form" },
 
       // ----- Logarithmic / Rational -----
-      { name: "Natural log",         eq: "y' = log(x)",                     cat: "Log / Rational" },
-      { name: "1/x",                 eq: "y' = 1/x",                        cat: "Log / Rational" },
-      { name: "Arctangent derivative", eq: "y' = 1/(1 + x^2)",              cat: "Log / Rational" },
-      { name: "y over x",            eq: "y' = y/x",                        cat: "Log / Rational" },
-      { name: "x over y",            eq: "y' = x/y",                        cat: "Log / Rational" },
-      { name: "Negative x over y (circles)", eq: "y' = -x/y",               cat: "Log / Rational" },
+      { name: "Natural log",         eq: "y' = log(x)",                     cat: "Log / Rational",     group: "Explicit Form" },
+      { name: "1/x",                 eq: "y' = 1/x",                        cat: "Log / Rational",     group: "Explicit Form" },
+      { name: "Arctangent derivative", eq: "y' = 1/(1 + x^2)",              cat: "Log / Rational",     group: "Explicit Form" },
+      { name: "y over x",            eq: "y' = y/x",                        cat: "Log / Rational",     group: "Explicit Form" },
+      { name: "x over y",            eq: "y' = x/y",                        cat: "Log / Rational",     group: "Explicit Form" },
+      { name: "Negative x over y (circles)", eq: "y' = -x/y",               cat: "Log / Rational",     group: "Explicit Form" },
 
       // ----- Trigonometric -----
-      { name: "sin x",               eq: "y' = sin(x)",                     cat: "Trigonometric" },
-      { name: "cos x",               eq: "y' = cos(x)",                     cat: "Trigonometric" },
-      { name: "sin y",               eq: "y' = sin(y)",                     cat: "Trigonometric" },
-      { name: "cos y",               eq: "y' = cos(y)",                     cat: "Trigonometric" },
-      { name: "sin(x)·cos(y)",       eq: "y' = sin(x)*cos(y)",              cat: "Trigonometric" },
-      { name: "sin(x) + cos(y)",     eq: "y' = sin(x) + cos(y)",            cat: "Trigonometric" },
-      { name: "tan(x)·y",            eq: "y' = tan(x)*y",                   cat: "Trigonometric" },
-      { name: "sin(x²)",             eq: "y' = sin(x^2)",                   cat: "Trigonometric" },
-      { name: "Negative y (oscillator)", eq: "y' = -y",                     cat: "Trigonometric" },
+      { name: "sin x",               eq: "y' = sin(x)",                     cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "cos x",               eq: "y' = cos(x)",                     cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "sin y",               eq: "y' = sin(y)",                     cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "cos y",               eq: "y' = cos(y)",                     cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "sin(x)·cos(y)",       eq: "y' = sin(x)*cos(y)",              cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "sin(x) + cos(y)",     eq: "y' = sin(x) + cos(y)",            cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "tan(x)·y",            eq: "y' = tan(x)*y",                   cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "sin(x²)",             eq: "y' = sin(x^2)",                   cat: "Trigonometric",      group: "Explicit Form" },
+      { name: "Negative y (oscillator)", eq: "y' = -y",                     cat: "Trigonometric",      group: "Explicit Form" },
 
       // ----- Roots -----
-      { name: "Square root of x",    eq: "y' = sqrt(x)",                    cat: "Roots" },
-      { name: "Square root of y",    eq: "y' = sqrt(y)",                    cat: "Roots" },
-      { name: "sqrt(1 + y²)",        eq: "y' = sqrt(1 + y^2)",              cat: "Roots" },
-      { name: "sqrt(x² + y²)",       eq: "y' = sqrt(x^2 + y^2)",            cat: "Roots" },
+      { name: "Square root of x",    eq: "y' = sqrt(x)",                    cat: "Roots",              group: "Explicit Form" },
+      { name: "Square root of y",    eq: "y' = sqrt(y)",                    cat: "Roots",              group: "Explicit Form" },
+      { name: "sqrt(1 + y²)",        eq: "y' = sqrt(1 + y^2)",              cat: "Roots",              group: "Explicit Form" },
+      { name: "sqrt(x² + y²)",       eq: "y' = sqrt(x^2 + y^2)",            cat: "Roots",              group: "Explicit Form" },
 
       // ----- Classic 1st-Order ODEs -----
-      { name: "Logistic growth",     eq: "y' = y*(1-y)",                    cat: "Classic ODEs" },
-      { name: "Logistic with carrying capacity", eq: "y' = 0.5*y*(1-y/4)",  cat: "Classic ODEs" },
-      { name: "Bernoulli",           eq: "y' = y - y^2",                    cat: "Classic ODEs" },
-      { name: "Riccati",             eq: "y' = x^2 + y^2",                  cat: "Classic ODEs" },
-      { name: "Homogeneous (y/x)",   eq: "y' = y/x + 1",                    cat: "Classic ODEs" },
-      { name: "Exact form example",  eq: "y' = -(2*x*y + 3) / (x^2 - 1)",   cat: "Classic ODEs" },
+      { name: "Logistic growth",     eq: "y' = y*(1-y)",                    cat: "Classic ODEs",       group: "Explicit Form" },
+      { name: "Logistic with carrying capacity", eq: "y' = 0.5*y*(1-y/4)",  cat: "Classic ODEs",       group: "Explicit Form" },
+      { name: "Bernoulli",           eq: "y' = y - y^2",                    cat: "Classic ODEs",       group: "Explicit Form" },
+      { name: "Riccati",             eq: "y' = x^2 + y^2",                  cat: "Classic ODEs",       group: "Explicit Form" },
+      { name: "Homogeneous (y/x)",   eq: "y' = y/x + 1",                    cat: "Classic ODEs",       group: "Explicit Form" },
+      { name: "Exact form example",  eq: "y' = -(2*x*y + 3) / (x^2 - 1)",   cat: "Classic ODEs",       group: "Explicit Form" },
 
       // ----- Phase Plane / Equilibria -----
-      { name: "Saddle point",        eq: "y' = x - y",                      cat: "Phase Plane" },
-      { name: "Spiral source",       eq: "y' = x + y",                      cat: "Phase Plane" },
-      { name: "Stable node",         eq: "y' = -2*y + x",                   cat: "Phase Plane" },
-      { name: "Center",              eq: "y' = -x/y",                       cat: "Phase Plane" },
-      { name: "Pitchfork bifurcation", eq: "y' = y^3 - y",                  cat: "Phase Plane" },
-      { name: "Transcritical bifurcation", eq: "y' = y*(1 - y/x)",          cat: "Phase Plane" },
+      { name: "Saddle point",        eq: "y' = x - y",                      cat: "Phase Plane",        group: "Explicit Form" },
+      { name: "Spiral source",       eq: "y' = x + y",                      cat: "Phase Plane",        group: "Explicit Form" },
+      { name: "Stable node",         eq: "y' = -2*y + x",                   cat: "Phase Plane",        group: "Explicit Form" },
+      { name: "Center",              eq: "y' = -x/y",                       cat: "Phase Plane",        group: "Explicit Form" },
+      { name: "Pitchfork bifurcation", eq: "y' = y^3 - y",                  cat: "Phase Plane",        group: "Explicit Form" },
+      { name: "Transcritical bifurcation", eq: "y' = y*(1 - y/x)",          cat: "Phase Plane",        group: "Explicit Form" },
 
       // ----- Nonlinear / Chaos-Adjacent -----
-      { name: "Van der Pol (1D slice)", eq: "y' = y - x^3/3 + x",           cat: "Nonlinear" },
-      { name: "Duffing (driven)",    eq: "y' = y - y^3 + cos(x)",           cat: "Nonlinear" },
-      { name: "Limit cycle",         eq: "y' = y - x*(x^2 + y^2 - 1)",      cat: "Nonlinear" },
-      { name: "Mathieu-type",        eq: "y' = -(1 + cos(x))*y",            cat: "Nonlinear" },
-      { name: "Abel equation",       eq: "y' = y^3 + x*y + sin(x)",         cat: "Nonlinear" },
-      { name: "Blow-up",             eq: "y' = 1 + y^2",                    cat: "Nonlinear" },
-
-      // ----- Implicit / Higher Forms -----
-      { name: "Implicit linear",     eq: "y' + tan(x)*y = x*sin(2*x)",      cat: "Implicit" },
-      { name: "Clairaut's equation", eq: "x*y' - y + (y')^2 = 0",           cat: "Implicit" },
-      { name: "Sum equals product",  eq: "y' + y = x*y",                    cat: "Implicit" },
-      { name: "Linear with cosine",  eq: "y' + 2*y = cos(x)",               cat: "Implicit" },
-      { name: "Linear with x",       eq: "y' - y/x = x^2",                  cat: "Implicit" },
+      { name: "Van der Pol (1D slice)", eq: "y' = y - x^3/3 + x",           cat: "Nonlinear",          group: "Explicit Form" },
+      { name: "Duffing (driven)",    eq: "y' = y - y^3 + cos(x)",           cat: "Nonlinear",          group: "Explicit Form" },
+      { name: "Limit cycle",         eq: "y' = y - x*(x^2 + y^2 - 1)",      cat: "Nonlinear",          group: "Explicit Form" },
+      { name: "Mathieu-type",        eq: "y' = -(1 + cos(x))*y",            cat: "Nonlinear",          group: "Explicit Form" },
+      { name: "Abel equation",       eq: "y' = y^3 + x*y + sin(x)",         cat: "Nonlinear",          group: "Explicit Form" },
+      { name: "Blow-up",             eq: "y' = 1 + y^2",                    cat: "Nonlinear",          group: "Explicit Form" },
 
       // ----- Engineering / Applied -----
-      { name: "Newton's cooling",    eq: "y' = -0.3*(y - 1)",               cat: "Engineering" },
-      { name: "RC circuit (AC)",     eq: "y' = -y + sin(x)",                cat: "Engineering" },
-      { name: "RL circuit",          eq: "y' = (10 - 3*y)/0.5",             cat: "Engineering" },
-      { name: "Mixing tank",         eq: "y' = (2 - 0.5*y)/10",             cat: "Engineering" },
-      { name: "Terminal velocity",   eq: "y' = 9.8 - 0.1*y^2",              cat: "Engineering" },
-      { name: "Logistic w/ harvest", eq: "y' = y*(1-y) - 0.2",              cat: "Engineering" },
-      { name: "Lotka-Volterra (slice)", eq: "y' = 2*y - 0.5*y*x",           cat: "Engineering" },
-      { name: "SIR epidemic (I)",    eq: "y' = 0.3*(1 - y)*y - 0.1*y",      cat: "Engineering" },
-      { name: "Chemical kinetics",   eq: "y' = 0.5*(1 - y)*(2 - y)",        cat: "Engineering" },
+      { name: "Newton's cooling",    eq: "y' = -0.3*(y - 1)",               cat: "Engineering",        group: "Explicit Form" },
+      { name: "RC circuit (AC)",     eq: "y' = -y + sin(x)",                cat: "Engineering",        group: "Explicit Form" },
+      { name: "RL circuit",          eq: "y' = (10 - 3*y)/0.5",             cat: "Engineering",        group: "Explicit Form" },
+      { name: "Mixing tank",         eq: "y' = (2 - 0.5*y)/10",             cat: "Engineering",        group: "Explicit Form" },
+      { name: "Terminal velocity",   eq: "y' = 9.8 - 0.1*y^2",              cat: "Engineering",        group: "Explicit Form" },
+      { name: "Logistic w/ harvest", eq: "y' = y*(1-y) - 0.2",              cat: "Engineering",        group: "Explicit Form" },
+      { name: "Lotka-Volterra (slice)", eq: "y' = 2*y - 0.5*y*x",           cat: "Engineering",        group: "Explicit Form" },
+      { name: "SIR epidemic (I)",    eq: "y' = 0.3*(1 - y)*y - 0.1*y",      cat: "Engineering",        group: "Explicit Form" },
+      { name: "Chemical kinetics",   eq: "y' = 0.5*(1 - y)*(2 - y)",        cat: "Engineering",        group: "Explicit Form" },
 
       // ----- Singular / Stiff -----
-      { name: "Singular at x=0",     eq: "y' = y/x + x",                    cat: "Singular / Stiff" },
-      { name: "Stiff ODE",           eq: "y' = -1000*(y - sin(x))",         cat: "Singular / Stiff" },
+      { name: "Singular at x=0",     eq: "y' = y/x + x",                    cat: "Singular / Stiff",   group: "Explicit Form" },
+      { name: "Stiff ODE",           eq: "y' = -1000*(y - sin(x))",         cat: "Singular / Stiff",   group: "Explicit Form" },
+
+      // ========== GROUP: IMPLICIT ==========
+      // F(x,y,y')=0 where y' cannot be algebraically isolated.
+      { name: "Quadratic in y'",        eq: "(y')^2 - 2*y' + y = 0",        cat: "Implicit",           group: "Implicit" },
+      { name: "Clairaut's equation",    eq: "x*y' - y + (y')^2 = 0",        cat: "Implicit",           group: "Implicit" },
+      { name: "sin of y' equals x",     eq: "sin(y') = x",                  cat: "Implicit",           group: "Implicit" },
+      { name: "y' plus sin(y')",        eq: "y' + sin(y') = x",             cat: "Implicit",           group: "Implicit" },
+      { name: "exp of y'",              eq: "e^(y') = x + y",               cat: "Implicit",           group: "Implicit" },
+      { name: "Cubic in y'",            eq: "(y')^3 - x*y' + y = 0",        cat: "Implicit",           group: "Implicit" },
+      { name: "Quadratic with x,y",     eq: "x*(y')^2 + y*y' - 1 = 0",      cat: "Implicit",           group: "Implicit" },
     ];
 
     function buildPresets(filter){
       presetsDropdown.innerHTML = '';
       const filterText = (filter || '').toLowerCase().trim();
-      // Group by category
-      const groups = {};
-      const order = [];
+      // Two-tier grouping: group -> cat -> items
+      const groupMap = {}; // group -> { catName -> [items] }
+      const groupOrder = [];
+      const catOrderByGroup = {}; // group -> [catName, ...]
       PRESETS.forEach(p => {
-        // Filter
         if (filterText) {
-          const haystack = (p.name + ' ' + p.eq + ' ' + p.cat).toLowerCase();
+          const haystack = (p.name + ' ' + p.eq + ' ' + p.cat + ' ' + (p.group || '')).toLowerCase();
           if (!haystack.includes(filterText)) return;
         }
-        if(!groups[p.cat]){ groups[p.cat] = []; order.push(p.cat); }
-        groups[p.cat].push(p);
+        const g = p.group || 'Other';
+        if (!groupMap[g]) { groupMap[g] = {}; catOrderByGroup[g] = []; groupOrder.push(g); }
+        if (!groupMap[g][p.cat]) { groupMap[g][p.cat] = []; catOrderByGroup[g].push(p.cat); }
+        groupMap[g][p.cat].push(p);
       });
-      if (order.length === 0) {
+      if (groupOrder.length === 0) {
         const empty = document.createElement('div');
         empty.style.cssText = 'padding: 16px; text-align: center; color: var(--muted); font-size: 13px;';
         empty.textContent = 'No matching templates';
         presetsDropdown.appendChild(empty);
         return;
       }
-      order.forEach(catName => {
-        // Category header
-        const header = document.createElement('div');
-        header.className = 'preset-cat-header';
-        header.textContent = catName;
-        presetsDropdown.appendChild(header);
-        // Items in category — each rendered with KaTeX
-        groups[catName].forEach(p => {
+      groupOrder.forEach(groupName => {
+        // Group (tier 1) header
+        const gh = document.createElement('div');
+        gh.className = 'preset-group-header';
+        gh.textContent = groupName;
+        presetsDropdown.appendChild(gh);
+        const cats = catOrderByGroup[groupName];
+        // If a group has exactly one subcategory with the same name as the group,
+        // suppress the redundant tier-2 header and do not indent items.
+        const suppressCatHeader = (cats.length === 1 && cats[0].toLowerCase() === groupName.toLowerCase());
+        cats.forEach((catName, catIdx) => {
+          if (!suppressCatHeader) {
+            // Category (tier 2) header
+            const header = document.createElement('div');
+            header.className = 'preset-cat-header' + (catIdx === 0 ? ' first-in-group' : '');
+            header.textContent = catName;
+            presetsDropdown.appendChild(header);
+          }
+          // Items in category — each rendered with KaTeX
+          groupMap[groupName][catName].forEach(p => {
           const btn = document.createElement('button');
-          btn.className = 'preset-item';
+          btn.className = 'preset-item' + (suppressCatHeader ? '' : ' in-group');
           const nameDiv = document.createElement('div');
           nameDiv.className = 'preset-name';
           nameDiv.textContent = p.name;
@@ -1044,6 +1073,7 @@
             updateInputStateUI();
           });
           presetsDropdown.appendChild(btn);
+          });
         });
       });
     }
