@@ -198,6 +198,30 @@
     .btn:active { transform: scale(0.97); }
     .btn svg { width: 15px; height: 15px; }
 
+    /* The rest of the row is deliberately neutral. These three are the controls a
+       first-time visitor has to find, and against either background a near-invisible
+       outlined pill reads as a label rather than something you can press - so they
+       get a filled colour instead. Amber on the theme switch because the page already
+       uses it as its accent and it matches what the button does. */
+    #presetsBtn { background: #8324c4; border-color: #8324c4; color: #fff; }
+    #presetsBtn:hover { background: #9436d6; border-color: #9436d6; }
+    #themeToggle { background: var(--accent); border-color: var(--accent); color: #1f1400; }
+    #themeToggle:hover { background: #fbaa2c; border-color: #fbaa2c; }
+    /* Inline styles on this one, so the override has to win on specificity. */
+    #replayIntro { background: #009e96 !important; border-color: #009e96 !important; color: #fff !important; }
+    #replayIntro:hover { background: #00b3aa !important; border-color: #00b3aa !important; }
+
+    /* None of these reuse the curve colours (#60a5fa blue, #34d399 green,
+       #f87171 red) - those mean "solution 1/2/3" in the plot, and repeating them
+       on buttons would imply a link that isn't there. Reset stays a muted slate
+       because it undoes work and shouldn't compete for attention. */
+    #exportPng { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+    #exportPng:hover { background: #2563eb; border-color: #2563eb; }
+    #shareBtn { background: #e71dca; border-color: #e71dca; color: #fff; }
+    #shareBtn:hover { background: #f43ada; border-color: #f43ada; }
+    #resetPoints { background: #64748b; border-color: #64748b; color: #fff; }
+    #resetPoints:hover { background: #7688a0; border-color: #7688a0; }
+
     .select {
       padding: 7px 12px; border: 1px solid var(--control-border); border-radius: 10px;
       background: var(--control-bg); color: var(--ink); font-size: 13px;
