@@ -67,14 +67,21 @@ export default async function handler(req, res) {
   }
 
   const unit = cap.body.purchase_units?.[0];
-  const captureId = unit?.payments?.captures?.[0]?.id;
+  const capture = unit?.payments?.captures?.[0];
+  const captureId = capture?.id;
 
   // custom_id holds the equation base64url-encoded, because PayPal only permits
   // letters, digits and -_., in that field. See create-checkout.js.
+  //
+  // On the CAPTURE response PayPal echoes custom_id inside the capture object,
+  // not on the purchase unit where it was sent - reading only the purchase unit
+  // returned "no equation attached" on a payment that had in fact gone through.
+  // Check both, capture first.
+  const rawCustomId = capture?.custom_id || unit?.custom_id || null;
   let equation = null;
-  if (unit?.custom_id) {
+  if (rawCustomId) {
     try {
-      equation = Buffer.from(unit.custom_id, 'base64url').toString('utf8');
+      equation = Buffer.from(rawCustomId, 'base64url').toString('utf8');
     } catch {
       equation = null;
     }
