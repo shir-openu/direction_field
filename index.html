@@ -683,8 +683,6 @@
 
     <!-- STATUS BAR -->
     <div class="status-bar glass">
-      <div id="solutionPanel"><div id="solutionBox"></div></div>
-
     <div class="status" id="status">Parsed: <code id="parsed">y' + tan(x)*y = x*sin(2*x)</code></div>
       <div id="note" class="status" aria-live="polite"></div>
     </div>
@@ -710,6 +708,14 @@
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
+
+  <!-- PAID SOLUTION DIALOG
+       A direct child of <body> on purpose. It used to sit in the status bar,
+       whose .glass backdrop-filter makes that bar the containing block for
+       position:fixed - so the dialog was pinned inside it, off-screen below
+       the canvas, which is the very bug it was added to fix. Nothing between
+       here and <body> may carry a filter, transform or perspective. -->
+  <div id="solutionPanel"><div id="solutionBox"></div></div>
 
   <!-- SCRIPTS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.10.1/mathquill.min.js" defer></script>
