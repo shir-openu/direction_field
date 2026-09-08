@@ -1,4 +1,4 @@
-// api/full-solution.js — step 2 of the paid flow: verify payment, then solve.
+// api/full-solution.js — step 2 of the paid flow: capture the payment, then solve.
 //
 // NEW ENDPOINT — nothing was overwritten to add it. The Direction Field had no
 // API before this repo; the app itself is unchanged and still runs offline for
@@ -14,8 +14,8 @@
 // The Anthropic key lives in Vercel's environment and never ships in the APK -
 // the phone app calls this endpoint exactly like the web page does.
 
-import Stripe from 'stripe';
 import Anthropic from '@anthropic-ai/sdk';
+import { paypalToken, paypalFetch, paypalConfigured } from './_paypal.js';
 
 const ALLOWED_ORIGIN = 'https://shir-openu.github.io';
 
@@ -32,48 +32,50 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { sessionId } = req.body || {};
-  if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
-
-  // Without this the Stripe constructor throws and the caller just sees a 500,
-  // which looks like a broken endpoint rather than an unset variable.
-  if (!process.env.STRIPE_SECRET_KEY) {
-    console.error('STRIPE_SECRET_KEY is not set in the Vercel environment');
+  if (!paypalConfigured()) {
+    console.error('PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET are not set in the Vercel environment');
     return res.status(503).json({ error: 'Payment is not configured yet' });
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const { orderId } = req.body || {};
+  if (!orderId) return res.status(400).json({ error: 'orderId is required' });
 
-  // ---- 1. Was this actually paid, and is it still unspent? -----------------
-  let session;
+  let token;
   try {
-    session = await stripe.checkout.sessions.retrieve(sessionId);
+    token = await paypalToken();
   } catch (e) {
-    // An id that Stripe does not recognise is a forgery, not a server fault.
-    return res.status(402).json({ error: 'Payment not found' });
+    console.error(e);
+    return res.status(502).json({ error: 'Payment provider unavailable' });
   }
 
-  if (session.payment_status !== 'paid') {
+  // ---- 1. Take the money ---------------------------------------------------
+  // Capture is the check. PayPal refuses to capture an order twice, so a replayed
+  // orderId fails here instead of needing an "already redeemed" flag of our own -
+  // which is the part a prepaid-pack design would have needed a database for.
+  const cap = await paypalFetch(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, token, {
+    method: 'POST',
+    body: '{}',
+  });
+
+  if (!cap.ok || cap.body?.status !== 'COMPLETED') {
+    const issue = cap.body?.details?.[0]?.issue;
+    if (issue === 'ORDER_ALREADY_CAPTURED') {
+      return res.status(409).json({ error: 'This solution has already been delivered' });
+    }
+    console.error('PayPal capture failed:', cap.status, cap.body);
     return res.status(402).json({ error: 'Payment not completed' });
   }
-  if (session.metadata?.redeemed === 'true') {
-    return res.status(409).json({ error: 'This solution has already been delivered' });
-  }
 
-  const equation = session.metadata?.equation;
+  const unit = cap.body.purchase_units?.[0];
+  const equation = unit?.custom_id;
+  const captureId = unit?.payments?.captures?.[0]?.id;
+
   if (!equation) {
+    await refund(token, captureId, 'no equation on the order');
     return res.status(400).json({ error: 'No equation attached to this payment' });
   }
 
-  // ---- 2. Spend it BEFORE calling Claude ----------------------------------
-  // Marking first means a crash or timeout costs the student their $1 once,
-  // rather than leaving a session that can be replayed for unlimited solutions.
-  // The refund path below covers the failure case.
-  await stripe.checkout.sessions.update(sessionId, {
-    metadata: { ...session.metadata, redeemed: 'true' },
-  });
-
-  // ---- 3. Solve ------------------------------------------------------------
+  // ---- 2. Solve ------------------------------------------------------------
   try {
     const client = new Anthropic(); // ANTHROPIC_API_KEY from Vercel env
 
@@ -84,18 +86,12 @@ export default async function handler(req, res) {
       output_config: { effort: 'high' },
       // Identical on every call, so caching makes the input side nearly free.
       system: [{ type: 'text', text: INSTRUCTIONS, cache_control: { type: 'ephemeral' } }],
-      messages: [{
-        role: 'user',
-        content: JSON.stringify({
-          equation,
-          initialCondition: session.metadata.initialCondition || null,
-        }),
-      }],
+      messages: [{ role: 'user', content: JSON.stringify({ equation }) }],
     });
 
     // Claude can decline and still return 200, so check before reading content.
     if (response.stop_reason === 'refusal') {
-      await refund(stripe, session, 'model declined');
+      await refund(token, captureId, 'model declined');
       return res.status(502).json({ error: 'Could not produce a solution. You have been refunded.' });
     }
 
@@ -105,7 +101,7 @@ export default async function handler(req, res) {
       .join('\n');
 
     if (!solution.trim()) {
-      await refund(stripe, session, 'empty solution');
+      await refund(token, captureId, 'empty solution');
       return res.status(502).json({ error: 'Could not produce a solution. You have been refunded.' });
     }
 
@@ -121,23 +117,27 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Anthropic API Error:', error);
-    await refund(stripe, session, 'api error');
+    await refund(token, captureId, 'api error');
     return res.status(500).json({ error: 'Could not produce a solution. You have been refunded.' });
   }
 }
 
 // Nobody should pay for an answer they did not get. A refund that itself fails
 // is logged rather than thrown, so the student still receives the error message
-// instead of a blank 500.
-async function refund(stripe, session, reason) {
+// instead of a blank 500 - but it needs a human to finish, hence the loud log.
+async function refund(token, captureId, reason) {
+  if (!captureId) {
+    console.error(`REFUND IMPOSSIBLE (no capture id): ${reason}`);
+    return;
+  }
   try {
-    await stripe.refunds.create({
-      payment_intent: session.payment_intent,
-      reason: 'requested_by_customer',
-      metadata: { auto_refund: reason },
+    const r = await paypalFetch(`/v2/payments/captures/${encodeURIComponent(captureId)}/refund`, token, {
+      method: 'POST',
+      body: JSON.stringify({ note_to_payer: 'Automatic refund: the solution could not be produced.' }),
     });
-    console.log(`Refunded ${session.id}: ${reason}`);
+    if (r.ok) console.log(`Refunded capture ${captureId}: ${reason}`);
+    else console.error(`REFUND FAILED for capture ${captureId} (${reason}):`, r.status, r.body);
   } catch (e) {
-    console.error(`REFUND FAILED for ${session.id} (${reason}):`, e);
+    console.error(`REFUND FAILED for capture ${captureId} (${reason}):`, e);
   }
 }
