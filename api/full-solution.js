@@ -1,11 +1,9 @@
-// api/full-solution.js — step 2 of the paid flow: capture the payment, then solve.
+// api/full-solution.js — step 2 of the paid flow: verify the purchase, then solve.
 //
-// NEW ENDPOINT — nothing was overwritten to add it. The Direction Field had no
-// API before this repo; the app itself is unchanged and still runs offline for
-// everything except this call.
+// The Direction Field had no API before this repo; the app itself is unchanged
+// and still runs offline for everything except this call.
 //   Pre-API state: commit 499213fbf0a5a5d62cfb4abe07f0ca3d0199866e (2026-08-17)
 //   https://github.com/shir-openu/direction_field/tree/499213fbf0a5a5d62cfb4abe07f0ca3d0199866e
-//   App source: D:\Dropbox\1PIPELINES1\FLUTTER_DIRECTION_FIELD_PHONE_APP\FLUTTER_1\DIRECTION_FIELD_MOB
 //
 // Separate from the Digital Friend endpoints (ODE-20218-2nd-DF*-en), which tutor
 // without giving the answer and run on Gemini. This one is paid, gives the
@@ -13,15 +11,15 @@
 //
 // The Anthropic key lives in Vercel's environment and never ships in the APK -
 // the phone app calls this endpoint exactly like the web page does.
+//
+// Payment is Gumroad, not PayPal: PayPal live requires an Israeli business
+// registration. See api/_gumroad.js for why and how.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { paypalToken, paypalFetch, paypalConfigured } from './_paypal.js';
+import { gumroadConfigured, gumroadSale, gumroadVerifyLicence } from './_gumroad.js';
 import { INSTRUCTIONS } from './_instructions.js';
 
 const ALLOWED_ORIGIN = 'https://shir-openu.github.io';
-
-// The prompt lives in its own module so this endpoint and the self-test use the
-// exact same text. See api/_instructions.js.
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
@@ -31,67 +29,52 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!paypalConfigured()) {
-    console.error('PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET are not set in the Vercel environment');
+  if (!gumroadConfigured()) {
+    console.error('GUMROAD_ACCESS_TOKEN / GUMROAD_PRODUCT_ID are not set');
     return res.status(503).json({ error: 'Payment is not configured yet' });
   }
 
-  const { orderId } = req.body || {};
-  if (!orderId) return res.status(400).json({ error: 'orderId is required' });
-
-  let token;
-  try {
-    token = await paypalToken();
-  } catch (e) {
-    console.error(e);
-    return res.status(502).json({ error: 'Payment provider unavailable' });
+  const { saleId, equation } = req.body || {};
+  if (!saleId) return res.status(400).json({ error: 'saleId is required' });
+  if (!equation || typeof equation !== 'string') {
+    return res.status(400).json({ error: 'equation is required' });
   }
 
-  // ---- 1. Take the money ---------------------------------------------------
-  // Capture is the check. PayPal refuses to capture an order twice, so a replayed
-  // orderId fails here instead of needing an "already redeemed" flag of our own -
-  // which is the part a prepaid-pack design would have needed a database for.
-  const cap = await paypalFetch(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, token, {
-    method: 'POST',
-    body: '{}',
-  });
-
-  if (!cap.ok || cap.body?.status !== 'COMPLETED') {
-    const issue = cap.body?.details?.[0]?.issue;
-    if (issue === 'ORDER_ALREADY_CAPTURED') {
-      return res.status(409).json({ error: 'This solution has already been delivered' });
-    }
-    console.error('PayPal capture failed:', cap.status, cap.body);
-    return res.status(402).json({ error: 'Payment not completed' });
+  // ---- 1. Was this actually bought? ---------------------------------------
+  const sale = await gumroadSale(saleId);
+  if (!sale.ok || !sale.sale) {
+    console.error('Gumroad sale lookup failed:', sale.status, sale.body);
+    return res.status(402).json({ error: 'Payment not found' });
+  }
+  if (sale.sale.refunded || sale.sale.chargebacked) {
+    return res.status(402).json({ error: 'This payment was refunded' });
   }
 
-  const unit = cap.body.purchase_units?.[0];
-  const capture = unit?.payments?.captures?.[0];
-  const captureId = capture?.id;
-
-  // custom_id holds the equation base64url-encoded, because PayPal only permits
-  // letters, digits and -_., in that field. See create-checkout.js.
-  //
-  // On the CAPTURE response PayPal echoes custom_id inside the capture object,
-  // not on the purchase unit where it was sent - reading only the purchase unit
-  // returned "no equation attached" on a payment that had in fact gone through.
-  // Check both, capture first.
-  const rawCustomId = capture?.custom_id || unit?.custom_id || null;
-  let equation = null;
-  if (rawCustomId) {
-    try {
-      equation = Buffer.from(rawCustomId, 'base64url').toString('utf8');
-    } catch {
-      equation = null;
-    }
+  const licenceKey = sale.sale.license_key;
+  if (!licenceKey) {
+    // Licence keys are what make a sale single-use here, so a product without
+    // them would hand out unlimited solutions for one payment.
+    console.error('Sale has no licence key - is "generate license key" enabled on the product?');
+    return res.status(500).json({ error: 'Payment could not be verified' });
   }
 
-  if (!equation) {
-    await refund(token, captureId, 'no equation on the order');
-    return res.status(400).json({ error: 'No equation attached to this payment' });
+  // ---- 2. Spend it ---------------------------------------------------------
+  // Gumroad increments the uses counter on every verify, so the first call
+  // returns 1 and a replay returns 2 or more. That is the whole single-use
+  // mechanism - no store of our own, nothing to keep in sync.
+  const licence = await gumroadVerifyLicence(licenceKey);
+  if (!licence.ok) {
+    console.error('Licence verify failed:', licence.status, licence.body);
+    return res.status(402).json({ error: 'Payment could not be verified' });
+  }
+  if (licence.refunded) {
+    return res.status(402).json({ error: 'This payment was refunded' });
+  }
+  if (licence.uses !== null && licence.uses > 1) {
+    return res.status(409).json({ error: 'This solution has already been delivered' });
   }
 
-  // ---- 2. Solve ------------------------------------------------------------
+  // ---- 3. Solve ------------------------------------------------------------
   try {
     const client = new Anthropic(); // ANTHROPIC_API_KEY from Vercel env
 
@@ -107,8 +90,7 @@ export default async function handler(req, res) {
 
     // Claude can decline and still return 200, so check before reading content.
     if (response.stop_reason === 'refusal') {
-      await refund(token, captureId, 'model declined');
-      return res.status(502).json({ error: 'Could not produce a solution. You have been refunded.' });
+      return res.status(502).json({ error: 'Could not produce a solution. Contact Shir for a refund.' });
     }
 
     const solution = response.content
@@ -117,14 +99,13 @@ export default async function handler(req, res) {
       .join('\n');
 
     if (!solution.trim()) {
-      await refund(token, captureId, 'empty solution');
-      return res.status(502).json({ error: 'Could not produce a solution. You have been refunded.' });
+      return res.status(502).json({ error: 'Could not produce a solution. Contact Shir for a refund.' });
     }
 
     return res.status(200).json({
       solution,
       equation,
-      // Real token counts, so the true cost per solution can replace the estimate.
+      // Real token counts, so the true cost per solution stays visible.
       usage: {
         input_tokens: response.usage.input_tokens,
         output_tokens: response.usage.output_tokens,
@@ -132,28 +113,9 @@ export default async function handler(req, res) {
       },
     });
   } catch (error) {
+    // Gumroad refunds are issued from its dashboard rather than by API here, so
+    // this says who to ask instead of promising an automatic refund it cannot make.
     console.error('Anthropic API Error:', error);
-    await refund(token, captureId, 'api error');
-    return res.status(500).json({ error: 'Could not produce a solution. You have been refunded.' });
-  }
-}
-
-// Nobody should pay for an answer they did not get. A refund that itself fails
-// is logged rather than thrown, so the student still receives the error message
-// instead of a blank 500 - but it needs a human to finish, hence the loud log.
-async function refund(token, captureId, reason) {
-  if (!captureId) {
-    console.error(`REFUND IMPOSSIBLE (no capture id): ${reason}`);
-    return;
-  }
-  try {
-    const r = await paypalFetch(`/v2/payments/captures/${encodeURIComponent(captureId)}/refund`, token, {
-      method: 'POST',
-      body: JSON.stringify({ note_to_payer: 'Automatic refund: the solution could not be produced.' }),
-    });
-    if (r.ok) console.log(`Refunded capture ${captureId}: ${reason}`);
-    else console.error(`REFUND FAILED for capture ${captureId} (${reason}):`, r.status, r.body);
-  } catch (e) {
-    console.error(`REFUND FAILED for capture ${captureId} (${reason}):`, e);
+    return res.status(500).json({ error: 'Could not produce a solution. Contact Shir for a refund.' });
   }
 }
