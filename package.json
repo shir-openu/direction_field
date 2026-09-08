@@ -1,8 +1,9 @@
 {
-  "name": "ode-direction-field-api",
-  "version": "1.0.0",
+  "name": "direction-field-api",
+  "version": "1.1.0",
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.70.0"
+    "@anthropic-ai/sdk": "^0.70.0",
+    "stripe": "^19.1.0"
   }
 }
