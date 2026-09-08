@@ -4,5 +4,12 @@
       "memory": 1024,
       "maxDuration": 60
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://shir-openu.github.io/direction_field/",
+      "permanent": false
+    }
+  ]
 }

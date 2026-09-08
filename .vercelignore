@@ -1,0 +1,8 @@
+# Vercel hosts the API only. The page itself is served from GitHub Pages at
+# https://shir-openu.github.io/direction_field/ — deploying a second copy here
+# split the visit counts between two live URLs.
+#
+# These files stay in the repo (GitHub Pages still serves them); they are just
+# not uploaded to Vercel.
+index.html
+privacy.html
