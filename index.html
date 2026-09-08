@@ -221,6 +221,21 @@
     #shareBtn:hover { background: #f43ada; border-color: #f43ada; }
     #resetPoints { background: #64748b; border-color: #64748b; color: #fff; }
     #resetPoints:hover { background: #7688a0; border-color: #7688a0; }
+    /* The only button that costs money, so it is the only green one. */
+    #fullSolutionBtn { background: #0f9d58; border-color: #0f9d58; color: #fff; font-weight: 700; }
+    #fullSolutionBtn:hover { background: #12b366; border-color: #12b366; }
+    #fullSolutionBtn:disabled { opacity: 0.6; cursor: wait; }
+
+    /* Where the purchased solution appears. Hidden until there is one. */
+    #solutionPanel {
+      display: none; margin: 14px 0 0; padding: 18px 22px;
+      background: var(--panel-solid); color: var(--ink);
+      border: 1px solid var(--control-border); border-left: 5px solid #0f9d58;
+      border-radius: var(--radius); line-height: 1.65; font-size: 15px;
+      white-space: pre-wrap; overflow-x: auto;
+    }
+    #solutionPanel h3 { margin: 0 0 10px; font-size: 16px; color: #0f9d58; }
+    #solutionPanel .sol-err { color: #f87171; }
 
     .select {
       padding: 7px 12px; border: 1px solid var(--control-border); border-radius: 10px;
@@ -595,6 +610,11 @@
         <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <span id="themeLabel">Bright view</span>
       </button>
+
+      <button class="btn" id="fullSolutionBtn" title="Buy the complete worked solution">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Full solution &mdash; $1
+      </button>
     </div>
 
     <!-- MOBILE COLLAPSIBLE -->
@@ -611,7 +631,9 @@
 
     <!-- STATUS BAR -->
     <div class="status-bar glass">
-      <div class="status" id="status">Parsed: <code id="parsed">y' + tan(x)*y = x*sin(2*x)</code></div>
+      <div id="solutionPanel"></div>
+
+    <div class="status" id="status">Parsed: <code id="parsed">y' + tan(x)*y = x*sin(2*x)</code></div>
       <div id="note" class="status" aria-live="polite"></div>
     </div>
 
@@ -1590,6 +1612,77 @@
         if(allowed.includes(params.get('arrows'))) arrowMode = params.get('arrows');
       }
     }
+
+    /* ===== PAID FULL SOLUTION =====
+       Two hops, because PayPal owns the middle of the flow:
+         1. Ask our API to open a $1 PayPal order, then hand the browser to PayPal.
+         2. PayPal sends the student back here with ?token=<orderId>; we pass that
+            id to the API, which captures the payment and returns the solution.
+       Nothing is stored on this side - the order id in the URL is the whole
+       receipt, and the API refuses to capture the same order twice. */
+    const API_BASE = 'https://direction-field.vercel.app';
+    const solutionPanel = document.getElementById('solutionPanel');
+    const fullSolutionBtn = document.getElementById('fullSolutionBtn');
+
+    function showSolution(html, isError) {
+      solutionPanel.style.display = 'block';
+      solutionPanel.innerHTML = isError
+        ? `<h3 class="sol-err">Something went wrong</h3>${html}`
+        : `<h3>Full solution</h3>${html}`;
+      solutionPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    const escapeHtml = (s) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+    fullSolutionBtn.addEventListener('click', async () => {
+      const equation = document.getElementById('inputRaw').value.trim();
+      if (!equation) { showSolution('Type an equation first.', true); return; }
+
+      fullSolutionBtn.disabled = true;
+      const original = fullSolutionBtn.querySelector('span, svg') ? null : null;
+      showSolution('Opening PayPal&hellip;', false);
+
+      try {
+        const r = await fetch(`${API_BASE}/api/create-checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ equation }),
+        });
+        const data = await r.json();
+        if (!r.ok || !data.url) throw new Error(data.error || 'Could not start checkout');
+        // Leaving the page is fine: PayPal returns here with the order id.
+        window.location.href = data.url;
+      } catch (e) {
+        fullSolutionBtn.disabled = false;
+        showSolution(escapeHtml(e.message), true);
+      }
+    });
+
+    // Coming back from PayPal. The order id arrives as ?token= - PayPal's own
+    // naming, nothing to do with auth tokens.
+    (async function redeemIfReturningFromPayPal() {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get('token');
+      if (!orderId) return;
+
+      // Clear it from the address bar so a refresh cannot re-post a spent order.
+      window.history.replaceState({}, '', window.location.pathname);
+
+      showSolution('Payment received. Solving&hellip; this can take a minute.', false);
+      try {
+        const r = await fetch(`${API_BASE}/api/full-solution`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Could not produce a solution');
+        document.getElementById('inputRaw').value = data.equation || '';
+        showSolution(escapeHtml(data.solution), false);
+      } catch (e) {
+        showSolution(escapeHtml(e.message), true);
+      }
+    })();
 
     /* ===== THEME ===== */
     themeToggleBtn.addEventListener('click', () => {
