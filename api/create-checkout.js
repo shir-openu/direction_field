@@ -35,6 +35,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'equation is too long' });
   }
 
+  // Without this the Stripe constructor throws and the caller just sees a 500,
+  // which looks like a broken endpoint rather than an unset variable.
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('STRIPE_SECRET_KEY is not set in the Vercel environment');
+    return res.status(503).json({ error: 'Payment is not configured yet' });
+  }
+
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 

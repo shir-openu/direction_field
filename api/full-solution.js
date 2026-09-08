@@ -35,6 +35,13 @@ export default async function handler(req, res) {
   const { sessionId } = req.body || {};
   if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
+  // Without this the Stripe constructor throws and the caller just sees a 500,
+  // which looks like a broken endpoint rather than an unset variable.
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('STRIPE_SECRET_KEY is not set in the Vercel environment');
+    return res.status(503).json({ error: 'Payment is not configured yet' });
+  }
+
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   // ---- 1. Was this actually paid, and is it still unspent? -----------------
