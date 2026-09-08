@@ -67,8 +67,18 @@ export default async function handler(req, res) {
   }
 
   const unit = cap.body.purchase_units?.[0];
-  const equation = unit?.custom_id;
   const captureId = unit?.payments?.captures?.[0]?.id;
+
+  // custom_id holds the equation base64url-encoded, because PayPal only permits
+  // letters, digits and -_., in that field. See create-checkout.js.
+  let equation = null;
+  if (unit?.custom_id) {
+    try {
+      equation = Buffer.from(unit.custom_id, 'base64url').toString('utf8');
+    } catch {
+      equation = null;
+    }
+  }
 
   if (!equation) {
     await refund(token, captureId, 'no equation on the order');

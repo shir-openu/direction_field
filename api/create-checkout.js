@@ -36,11 +36,15 @@ export default async function handler(req, res) {
   if (!equation || typeof equation !== 'string') {
     return res.status(400).json({ error: 'equation is required' });
   }
-  // PayPal caps custom_id at 127 characters, and an equation longer than that
-  // is already not a real one.
-  if (equation.length > 120) {
+  // custom_id is capped at 127 characters AND restricted to letters, digits and
+  // -_., - so a plain equation is rejected outright: apostrophes, spaces, "=",
+  // "*" and brackets are all outside the set. Base64url encoding keeps the
+  // equation byte-exact while using only permitted characters. It costs about a
+  // third in length, so the equation itself is capped well below 127.
+  if (equation.length > 90) {
     return res.status(400).json({ error: 'equation is too long' });
   }
+  const encodedEquation = Buffer.from(equation, 'utf8').toString('base64url');
 
   try {
     const token = await paypalToken();
@@ -51,11 +55,13 @@ export default async function handler(req, res) {
         intent: 'CAPTURE',
         purchase_units: [{
           amount: { currency_code: 'USD', value: PRICE },
-          description: `Full solution: ${equation}`.slice(0, 127),
+          // Shown to the buyer on the PayPal page, so it stays human-readable -
+          // but stripped of characters PayPal rejects in this field.
+          description: `Full solution: ${equation}`.replace(/[^\w\s.,:;+\-*/^()=']/g, '').slice(0, 127),
           // The equation is pinned to the order at purchase time. The redemption
           // endpoint reads it back from here rather than trusting whatever the
           // browser sends, so a paid order can only buy what it was bought for.
-          custom_id: equation,
+          custom_id: encodedEquation,
         }],
         application_context: {
           brand_name: 'ODE Direction Field',
