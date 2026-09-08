@@ -85,6 +85,14 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('PayPal error:', error);
+    if (error.paypalStatus === 401) {
+      // Named explicitly because the fix is specific and otherwise invisible:
+      // the credentials do not belong to the environment being called.
+      return res.status(502).json({
+        error: 'PayPal rejected the credentials',
+        hint: `Client id/secret are not valid for the ${paypalBase().includes('sandbox') ? 'sandbox' : 'live'} environment`,
+      });
+    }
     return res.status(500).json({ error: 'Could not start checkout' });
   }
 }

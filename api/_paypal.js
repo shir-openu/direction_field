@@ -35,7 +35,13 @@ export async function paypalToken() {
   });
 
   if (!r.ok) {
-    throw new Error(`PayPal auth failed: ${r.status} ${await r.text()}`);
+    // The status is the whole diagnosis: 401 means the client id/secret are wrong
+    // for this environment - almost always Live credentials against the sandbox
+    // host, or the two values swapped. Carried on the error so the endpoint can
+    // report it without anything sensitive leaving the server.
+    const err = new Error(`PayPal auth failed: ${r.status}`);
+    err.paypalStatus = r.status;
+    throw err;
   }
   const data = await r.json();
   return data.access_token;
