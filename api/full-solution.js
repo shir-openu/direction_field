@@ -16,7 +16,7 @@
 // registration. See api/_gumroad.js for why and how.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { gumroadConfigured, gumroadSale, gumroadVerifyLicence } from './_gumroad.js';
+import { gumroadConfigured, gumroadVerifyLicence } from './_gumroad.js';
 import { INSTRUCTIONS } from './_instructions.js';
 
 const ALLOWED_ORIGIN = 'https://shir-openu.github.io';
@@ -34,47 +34,32 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Payment is not configured yet' });
   }
 
-  const { saleId, equation } = req.body || {};
-  if (!saleId) return res.status(400).json({ error: 'saleId is required' });
+  const { licenceKey, equation } = req.body || {};
+  if (!licenceKey || typeof licenceKey !== 'string') {
+    return res.status(400).json({ error: 'licenceKey is required' });
+  }
   if (!equation || typeof equation !== 'string') {
     return res.status(400).json({ error: 'equation is required' });
   }
 
-  // ---- 1. Was this actually bought? ---------------------------------------
-  const sale = await gumroadSale(saleId);
-  if (!sale.ok || !sale.sale) {
-    console.error('Gumroad sale lookup failed:', sale.status, sale.body);
-    return res.status(402).json({ error: 'Payment not found' });
-  }
-  if (sale.sale.refunded || sale.sale.chargebacked) {
-    return res.status(402).json({ error: 'This payment was refunded' });
-  }
-
-  const licenceKey = sale.sale.license_key;
-  if (!licenceKey) {
-    // Licence keys are what make a sale single-use here, so a product without
-    // them would hand out unlimited solutions for one payment.
-    console.error('Sale has no licence key - is "generate license key" enabled on the product?');
-    return res.status(500).json({ error: 'Payment could not be verified' });
-  }
-
-  // ---- 2. Spend it ---------------------------------------------------------
-  // Gumroad increments the uses counter on every verify, so the first call
-  // returns 1 and a replay returns 2 or more. That is the whole single-use
-  // mechanism - no store of our own, nothing to keep in sync.
-  const licence = await gumroadVerifyLicence(licenceKey);
+  // ---- 1. Spend the key ----------------------------------------------------
+  // Verifying is what proves the purchase AND what consumes it: Gumroad
+  // increments the uses counter on every verify, so the first call returns 1
+  // and a replay returns 2 or more. That is the whole single-use mechanism -
+  // no store of our own, nothing to keep in sync.
+  const licence = await gumroadVerifyLicence(licenceKey.trim());
   if (!licence.ok) {
     console.error('Licence verify failed:', licence.status, licence.body);
-    return res.status(402).json({ error: 'Payment could not be verified' });
+    return res.status(402).json({ error: 'That licence key was not recognised' });
   }
   if (licence.refunded) {
     return res.status(402).json({ error: 'This payment was refunded' });
   }
   if (licence.uses !== null && licence.uses > 1) {
-    return res.status(409).json({ error: 'This solution has already been delivered' });
+    return res.status(409).json({ error: 'This licence key has already been used' });
   }
 
-  // ---- 3. Solve ------------------------------------------------------------
+  // ---- 2. Solve ------------------------------------------------------------
   try {
     const client = new Anthropic(); // ANTHROPIC_API_KEY from Vercel env
 

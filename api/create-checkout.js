@@ -2,12 +2,13 @@
 //
 // Gumroad needs no server call to start a purchase: the product has a fixed URL.
 // This endpoint exists so the page has one place to ask where to send the buyer,
-// and so the equation can be carried through the purchase and back again.
+// and so the product URL is configuration rather than something baked into the
+// published HTML.
 //
-// Gumroad appends any ?parameter on the product URL to its post-purchase
-// redirect, so the equation makes the round trip without a database. It is
-// base64url-encoded because it travels in a URL and equations are full of
-// characters that do not.
+// The equation does not travel with them. Checkout opens in a second tab and the
+// page stays put holding it, because Gumroad's current editor has no
+// "redirect after purchase" - there is no return trip to carry anything back.
+// What comes back is the licence key, pasted by the buyer.
 //
 // Replaced the PayPal version: PayPal live requires an Israeli business
 // registration Shir does not have. Gumroad is a merchant of record and pays
@@ -30,6 +31,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Payment is not configured yet' });
   }
 
+  // Still required, so the page cannot open a paid checkout for an empty box.
   const { equation } = req.body || {};
   if (!equation || typeof equation !== 'string') {
     return res.status(400).json({ error: 'equation is required' });
@@ -38,8 +40,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'equation is too long' });
   }
 
-  const encoded = Buffer.from(equation, 'utf8').toString('base64url');
-  const url = `${process.env.GUMROAD_PRODUCT_URL}?wanted=true&eq=${encoded}`;
+  // wanted=true opens Gumroad straight on the checkout rather than the
+  // product's description page.
+  const url = `${process.env.GUMROAD_PRODUCT_URL}?wanted=true`;
 
   return res.status(200).json({ url });
 }

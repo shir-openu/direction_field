@@ -11,21 +11,16 @@
 // primitive: a licence key carries a uses counter that Gumroad increments on
 // every verify. First verify returns uses = 1; a replay returns 2 or more, and
 // we refuse. Gumroad holds the state, so there is still nothing to provision.
+//
+// The buyer pastes that key into the page. There is no sale-id lookup here
+// because Gumroad's current editor dropped "redirect after purchase", so there
+// is no return trip to carry a sale id - the key they are shown, and mailed,
+// is the receipt.
 
 const API = 'https://api.gumroad.com/v2';
 
 export function gumroadConfigured() {
   return Boolean(process.env.GUMROAD_ACCESS_TOKEN && process.env.GUMROAD_PRODUCT_ID);
-}
-
-// Look up a completed sale to get the licence key that was issued with it.
-// The buyer never has to copy anything: Gumroad redirects back with sale_id.
-export async function gumroadSale(saleId) {
-  const r = await fetch(
-    `${API}/sales/${encodeURIComponent(saleId)}?access_token=${encodeURIComponent(process.env.GUMROAD_ACCESS_TOKEN)}`
-  );
-  const body = await r.json().catch(() => null);
-  return { ok: r.ok && body?.success, status: r.status, sale: body?.sale || null, body };
 }
 
 // increment_uses_count defaults to true on Gumroad's side, but it is the whole

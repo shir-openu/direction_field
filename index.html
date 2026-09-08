@@ -236,6 +236,18 @@
     }
     #solutionPanel h3 { margin: 0 0 10px; font-size: 16px; color: #0f9d58; }
     #solutionPanel .sol-err { color: #f87171; }
+    /* The redeem form. The panel is pre-wrap for the solution text, so these
+       need explicit margins rather than relying on collapsing ones. */
+    #solutionPanel p { margin: 0 0 10px; font-size: 13px; opacity: 0.85; }
+    #licenceInput {
+      width: 100%; max-width: 420px; margin: 0 0 10px; padding: 9px 12px;
+      border: 1px solid var(--control-border); border-radius: 10px;
+      background: var(--control-bg); color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;
+    }
+    #licenceInput:focus { outline: none; border-color: #0f9d58; }
+    #redeemBtn { display: block; background: #0f9d58; border-color: #0f9d58; color: #fff; font-weight: 700; }
+    #redeemBtn:disabled { opacity: 0.6; cursor: wait; }
 
     .select {
       padding: 7px 12px; border: 1px solid var(--control-border); border-radius: 10px;
@@ -613,7 +625,7 @@
 
       <button class="btn" id="fullSolutionBtn" title="Buy the complete worked solution">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Full solution &mdash; $1
+        Full solution &mdash; $5
       </button>
     </div>
 
@@ -1614,13 +1626,16 @@
     }
 
     /* ===== PAID FULL SOLUTION =====
-       Two hops, because the payment page is not ours:
-         1. Ask our API where to send the buyer, then hand the browser to Gumroad.
-         2. Gumroad sends the student back here with ?sale_id=..., and echoes the
-            equation we passed it; both go to the API, which checks the purchase
-            and returns the solution.
-       Nothing is stored on this side - the sale id is the whole receipt, and the
-       licence attached to it can only be spent once. */
+       Checkout opens in a SECOND TAB and this page never navigates away. That is
+       deliberate: Gumroad's current editor has no "redirect after purchase"
+       option (only Move up / Move down / Delete on a content block), so there is
+       no return trip that could carry the equation back. Keeping this tab alive
+       keeps the equation in memory, and the buyer returns to it themselves.
+
+       What they bring back is the licence key Gumroad shows them - and mails
+       them - after paying. They paste it here, and the API spends it: Gumroad
+       increments the key's uses counter on verify, so a second paste is refused.
+       Nothing is stored on this side; the key is the whole receipt. */
     const API_BASE = 'https://direction-field.vercel.app';
     const solutionPanel = document.getElementById('solutionPanel');
     const fullSolutionBtn = document.getElementById('fullSolutionBtn');
@@ -1649,6 +1664,54 @@
 
     const escapeHtml = (s) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
+    // The equation as it was when checkout opened. Read once and held, so that
+    // editing the field while the Gumroad tab is open cannot silently change
+    // which equation the student paid to have solved.
+    let paidEquation = '';
+
+    function showRedeemForm() {
+      solutionPanel.style.display = 'block';
+      solutionPanel.innerHTML =
+        '<h3>Paste your licence key</h3>' +
+        '<p>Gumroad shows it after payment, and emails it to you.</p>' +
+        '<input id="licenceInput" type="text" spellcheck="false" autocomplete="off" ' +
+        'placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX">' +
+        '<button class="btn" id="redeemBtn">Get my solution</button>' +
+        '<p id="redeemNote"></p>';
+      solutionPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      const input = document.getElementById('licenceInput');
+      const note = document.getElementById('redeemNote');
+      const redeem = document.getElementById('redeemBtn');
+      input.focus();
+
+      async function submit() {
+        const licenceKey = input.value.trim();
+        if (!licenceKey) { note.textContent = 'Paste the key first.'; return; }
+
+        redeem.disabled = true;
+        note.textContent = 'Checking your payment, then solving. This can take a minute.';
+        try {
+          const r = await fetch(`${API_BASE}/api/full-solution`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ licenceKey, equation: paidEquation || readEquation() }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Could not produce a solution');
+          showSolution(escapeHtml(data.solution), false);
+        } catch (e) {
+          // Leave the form up: a wrong key is worth retyping, and the key is
+          // only spent once the API accepts it.
+          redeem.disabled = false;
+          note.textContent = e.message;
+        }
+      }
+
+      redeem.addEventListener('click', submit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    }
+
     fullSolutionBtn.addEventListener('click', async () => {
       const equation = readEquation();
       if (!equation) { showSolution('Type an equation first.', true); return; }
@@ -1664,48 +1727,17 @@
         });
         const data = await r.json();
         if (!r.ok || !data.url) throw new Error(data.error || 'Could not start checkout');
-        // Leaving the page is fine: PayPal returns here with the order id.
-        window.location.href = data.url;
+        paidEquation = equation;
+        // A new tab, not a navigation: this page has to survive to hold the
+        // equation and to take the licence key when they come back.
+        window.open(data.url, '_blank', 'noopener');
+        showRedeemForm();
       } catch (e) {
-        fullSolutionBtn.disabled = false;
         showSolution(escapeHtml(e.message), true);
+      } finally {
+        fullSolutionBtn.disabled = false;
       }
     });
-
-    // Coming back from Gumroad. It appends sale_id, and echoes back the eq
-    // parameter we sent it, so the equation survives the trip without a database.
-    (async function redeemIfReturningFromGumroad() {
-      const params = new URLSearchParams(window.location.search);
-      const saleId = params.get('sale_id');
-      const eq = params.get('eq');
-      if (!saleId) return;
-
-      let equation = '';
-      try {
-        equation = eq ? decodeURIComponent(escape(atob(eq.replace(/-/g, '+').replace(/_/g, '/')))) : '';
-      } catch { equation = ''; }
-      if (!equation) equation = readEquation();
-
-      // Clear the address bar so a refresh cannot re-post a spent sale.
-      window.history.replaceState({}, '', window.location.pathname);
-
-      const el = equationField();
-      if (el && equation) el.value = equation;
-
-      showSolution('Payment received. Solving&hellip; this can take a minute.', false);
-      try {
-        const r = await fetch(`${API_BASE}/api/full-solution`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ saleId, equation }),
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Could not produce a solution');
-        showSolution(escapeHtml(data.solution), false);
-      } catch (e) {
-        showSolution(escapeHtml(e.message), true);
-      }
-    })();
 
     /* ===== THEME ===== */
     themeToggleBtn.addEventListener('click', () => {
